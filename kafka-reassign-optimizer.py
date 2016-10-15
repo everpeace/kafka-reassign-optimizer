@@ -17,40 +17,42 @@ kafka-reassign-optimizer.py
       }
     }
 """
+import os
 import sys
-from logging import getLogger, StreamHandler, DEBUG
+import logging
 import math
 from itertools import groupby, product
 import json
 import pulp
 
-def propose_assignment_with_minimum_move(spec):
-    logger.info("# input information for making assignment proposal")
-    logger.info("brokers= %s", spec.brokers)
-    logger.info("new_replication_factor= %s", spec.new_replication_factor)
-    logger.info("topics= %s", spec.topics)
-    logger.info("partitions=%s", [ (t, len(spec.topic2partition[t])) for t in spec.topic2partition ])
-    logger.info("total_partitions= %s", spec.total_partitions)
-    logger.info("total_replicas_to_assign= %s", spec.total_replicas)
-    if spec.balanced_load_min == spec.balanced_load_max:
-        logger.info("balanced_load= %s", spec.balanced_load_min)
+def propose_assignment_with_minimum_move(config):
+    logger.info("# Configurations for reassignment partition replicas")
+    logger.info("brokers= %s", config.brokers)
+    if config.new_replication_factor > 0:
+        logger.info("new_replication_factor= %s", config.new_replication_factor)
+    logger.info("topics= %s", config.topics)
+    logger.info("partitions=%s", [ (t, len(config.topic2partition[t])) for t in config.topic2partition ])
+    logger.info("total_partitions= %s", config.total_partitions)
+    logger.info("total_replicas_to_assign= %s", config.total_replicas)
+    if config.balanced_load_min == config.balanced_load_max:
+        logger.info("balanced_load= %s", config.balanced_load_min)
     else:
-        logger.info("balanced_load_min= %s", spec.balanced_load_min)
-        logger.info("balanced_load_max= %s", spec.balanced_load_max)
+        logger.info("balanced_load_min= %s", config.balanced_load_min)
+        logger.info("balanced_load_max= %s", config.balanced_load_max)
 
     # binary integer programming instance
     problem = pulp.LpProblem('Minimize Parition Replica Movement for Partition Reassignment', pulp.LpMinimize)
 
     # varaiables
     proposed_assignment = dict()
-    for (t,p,b) in spec.tpbs:
+    for (t,p,b) in config.tpbs:
         proposed_assignment[(t,p,b)] = pulp.LpVariable("{}_{}_B{}".format(t,p,b), 0, 1, 'Integer')
 
     # objective function: number of newly assigned partitions
     num_movement = 0
-    for (t,p,b) in spec.tpbs:
-        if spec.current_assignment[(t,p,b)] == 0:
-            # num_movement += spec.partition_weight[(t,p)] * proposed_assignment[(t,p,b)]
+    for (t,p,b) in config.tpbs:
+        if config.current_assignment[(t,p,b)] == 0:
+            # num_movement += config.partition_weight[(t,p)] * proposed_assignment[(t,p,b)]
             num_movement += proposed_assignment[(t,p,b)]
     problem += num_movement
 
@@ -59,32 +61,32 @@ def propose_assignment_with_minimum_move(spec):
     #
     # c1: total_replicas
     _total_replicas = 0
-    for (t, p, b) in spec.tpbs:
+    for (t, p, b) in config.tpbs:
         _total_replicas += proposed_assignment[(t,p,b)]
-    problem += _total_replicas == spec.total_replicas, "number or total replicas is %s" % spec.total_replicas
+    problem += _total_replicas == config.total_replicas, "number or total replicas is %s" % config.total_replicas
 
     # c2: each partition has replication factor
-    for (t, p) in spec.tps:
+    for (t, p) in config.tps:
         replicas = 0
         current_replicas = 0
-        for b in spec.brokers:
+        for b in config.brokers:
             replicas += proposed_assignment[(t,p,b)]
-            current_replicas += spec.current_assignment[(t,p,b)]
-        if spec.new_replication_factor > 0:
-            problem += replicas == spec.new_replication_factor, "partition (%s,%s) has replication factor %s" % (t,p, spec.new_replication_factor)
+            current_replicas += config.current_assignment[(t,p,b)]
+        if config.new_replication_factor > 0:
+            problem += replicas == config.new_replication_factor, "partition (%s,%s) has replication factor %s" % (t,p, config.new_replication_factor)
         else:
             problem += replicas == current_replicas, "partition (%s,%s) has replication factor %s" % (t,p, current_replicas)
 
     # c3: new assignment is well_balanced
-    for b in spec.brokers:
+    for b in config.brokers:
         score = 0
-        for (t, p) in spec.tps:
+        for (t, p) in config.tps:
             score += proposed_assignment[(t, p, b)]
-        if spec.balanced_load_max == spec.balanced_load_min:
-            problem += score == spec.balanced_load_max, "load of broker %s is balanced." % b
+        if config.balanced_load_max == config.balanced_load_min:
+            problem += score == config.balanced_load_max, "load of broker %s is balanced." % b
         else:
-            problem += score >= spec.balanced_load_min, "load of broker %s is greater than or equal to %s" % (b, spec.balanced_load_min)
-            problem += score <= spec.balanced_load_max, "load of broker %s is less than or equal to %s" % (b, spec.balanced_load_max)
+            problem += score >= config.balanced_load_min, "load of broker %s is greater than or equal to %s" % (b, config.balanced_load_min)
+            problem += score <= config.balanced_load_max, "load of broker %s is less than or equal to %s" % (b, config.balanced_load_max)
 
     logger.debug("\n# Binary Integer Programming")
     logger.debug(problem)
@@ -100,36 +102,36 @@ def propose_assignment_with_minimum_move(spec):
     logger.debug("\n# CURRENT ASSIGNMENT")
     logger.debug(
         assignment_str(
-            spec,
-            spec.current_assignment)
+            config,
+            config.current_assignment)
     )
     logger.debug("\n# PROPOSED ASSIGNMENT")
     logger.debug(
         assignment_str(
-            spec,
+            config,
             dict((k, proposed_assignment[k].value()) for k in proposed_assignment))
     )
 
     return (problem, status, proposed_assignment)
 
-def assignment_str(spec, _assignment):
+def assignment_str(config, _assignment):
     str = []
     str.append("broker \t\t")
-    for b in spec.brokers:
+    for b in config.brokers:
         str.append("%s\t" % b)
     str.append("\n")
-    for (t,p) in spec.tps:
+    for (t,p) in config.tps:
         str.append("%s_%s\t" % (t, p))
-        for b in spec.brokers:
+        for b in config.brokers:
             str.append("%s\t" % int(_assignment[(t,p,b)]))
         str.append("\n")
     return ''.join(str)
 
-class ReassignmentSpec:
+class ReassignmentOptimizerConfig:
     def __init__(self, _json):
-        self._underlying_json = _json
+        self.__json = _json
         self.brokers = sorted([ int(b) for b in _json["brokers"].split(',') ])
-        self.new_replication_factor = int(loaded_json["new_replication_factor"]) if loaded_json.has_key("new_replication_factor") else -1
+        self.new_replication_factor = int(_json["new_replication_factor"]) if _json.has_key("new_replication_factor") else -1
 
         _t2p = dict()
         _tp = sorted([(p["topic"], p["partition"]) for p in _json["partitions"]["partitions"]], key=lambda x: (x[0],x[1]))
@@ -145,6 +147,8 @@ class ReassignmentSpec:
                 _tps.append((t,p))
                 for b in sorted(self.brokers):
                     _tpbs.append((t,p,b))
+
+        # list of tuples: it's only for avoid nested loops
         self.tpbs = _tpbs
         self.tps = _tps
 
@@ -172,20 +176,26 @@ class ReassignmentSpec:
     #     self.partition_weight = tp2w
 
 if __name__ == '__main__':
-    logger = getLogger()
-    logger.setLevel(DEBUG)
-    ch = StreamHandler(sys.stderr)
-    ch.setLevel(DEBUG)
+    logger = logging.getLogger()
+    if os.environ.has_key("LOGLEVEL"):
+        level = getattr(logging, os.environ["LOGLEVEL"].upper())
+    else:
+        level = logging.INFO
+    logger.setLevel(level)
+    ch = logging.StreamHandler(sys.stderr)
+    ch.setLevel(level)
     logger.addHandler(ch)
 
     loaded_json = json.load(sys.stdin, encoding='utf-8')
-    reassignment_spec = ReassignmentSpec(loaded_json)
-    (problem, status, proposed_assignment) = propose_assignment_with_minimum_move(reassignment_spec)
+    reassignment_config = ReassignmentOptimizerConfig(loaded_json)
+    (problem, status, proposed_assignment) = propose_assignment_with_minimum_move(reassignment_config)
 
+    logger.info("")
+    logger.info("# Partition Replica Assignment (copy it and input to kafka-reassign-partition.sh)")
     proposed_assignment_json = { 'vertion': 1, 'partitions':[] }
-    for (t, p) in reassignment_spec.tps:
+    for (t, p) in reassignment_config.tps:
         replicas = []
-        for b in reassignment_spec.brokers:
+        for b in reassignment_config.brokers:
             if int(proposed_assignment[(t,p,b)].value()) == 1:
                 replicas.append(b)
         proposed_assignment_json["partitions"].append({

@@ -13,7 +13,7 @@ This small python script:
 # on Docker (preferred)
 ```
 $ docker pull everpeace/kafka-reassign-optimizer
-$ docker run -i everpeace/kafka-reassign-optimizer < ./sample_input.json
+$ docker run -i -e 'LOGLEVEL=debug' everpeace/kafka-reassign-optimizer < ./sample_input.json
 # input information for making assignment proposal
 brokers= [1, 2, 3, 4, 5]
 new_replication_factor= -1
