@@ -11,6 +11,9 @@ This small python script:
 
 # How to try?
 # on Docker (preferred)
+
+[Docker image](https://hub.docker.com/r/everpeace/kafka-reassign-optimizer/) is available and you can start using this so easily.
+
 ```
 $ docker pull everpeace/kafka-reassign-optimizer
 $ docker run -i -e 'LOGLEVEL=debug' everpeace/kafka-reassign-optimizer < ./sample_input.json
