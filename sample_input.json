@@ -5,12 +5,7 @@
     "partitions": [
       { "topic": "message", "partition": 0, "replicas": [ 1, 2, 3] },
       { "topic": "message", "partition": 1, "replicas": [ 1, 2, 3] },
-      { "topic": "message", "partition": 2, "replicas": [ 1, 2, 3] },
-      { "topic": "message", "partition": 3, "replicas": [ 1, 2, 3] },
-      { "topic": "message", "partition": 4, "replicas": [ 1, 2, 3] },
-      { "topic": "message", "partition": 5, "replicas": [ 1, 2, 3] },
-      { "topic": "message", "partition": 6, "replicas": [ 1, 2, 3] },
-      { "topic": "message", "partition": 7, "replicas": [ 1, 2, 3] }
+      { "topic": "message", "partition": 2, "replicas": [ 1, 2, 3] }
     ]
   }
 }
