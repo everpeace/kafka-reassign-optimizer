@@ -8,6 +8,8 @@ This small python script:
   * the number of replica movement is minimum(optimal).
 * by formalizing this problem as Mixed Binary Integer Programming
 * and the optimization problem is solved by [PuLP](https://pythonhosted.org/PuLP/index.html)
+* (optional) you can
+  * pin some specific replicas to specific brokers. (see [sample_input_with_pinned_replicas.json](sample_input_with_pinned_replicas.json)).  This would be useful when you don't want to move leader replicas.
 
 # How to try?
 # on Docker (preferred)

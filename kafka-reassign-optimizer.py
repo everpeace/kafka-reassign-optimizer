@@ -15,6 +15,11 @@ kafka-reassign-optimizer.py
             ...
         ]
       }
+      // pinned_replicas are optional
+      "pinned_replicas": [
+        {"topic": "t1", "partition": 0, "replica": 3 },
+        ...
+      ]
     }
 """
 import os
@@ -34,6 +39,8 @@ def propose_assignment_with_minimum_move(config):
     logger.info("partitions=%s", [ (t, len(config.topic2partition[t])) for t in config.topic2partition ])
     logger.info("total_partitions= %s", config.total_partitions)
     logger.info("total_replicas_to_assign= %s", config.total_replicas)
+    if config.pinned_replicas:
+        logger.info("pinned parition replica: %s", config.pinned_replicas)
     if config.balanced_load_min == config.balanced_load_max:
         logger.info("balanced_load= %s", config.balanced_load_min)
     else:
@@ -43,10 +50,13 @@ def propose_assignment_with_minimum_move(config):
     # binary integer programming instance
     problem = pulp.LpProblem('Minimize Parition Replica Movement for Partition Reassignment', pulp.LpMinimize)
 
-    # varaiables
+    # varaiable
     proposed_assignment = dict()
     for (t,p,b) in config.tpbs:
-        proposed_assignment[(t,p,b)] = pulp.LpVariable("{}_{}_B{}".format(t,p,b), 0, 1, 'Integer')
+        if config.pinned_replicas.has_key((t,p,b)):
+            proposed_assignment[(t,p,b)] = pulp.LpVariable("{}_{}_B{}".format(t,p,b), 1, 1, 'Integer')
+        else:
+            proposed_assignment[(t,p,b)] = pulp.LpVariable("{}_{}_B{}".format(t,p,b), 0, 1, 'Integer')
 
     # objective function: number of newly assigned partitions
     num_movement = 0
@@ -129,6 +139,7 @@ def assignment_str(config, _assignment):
 
 class ReassignmentOptimizerConfig:
     def __init__(self, _json):
+        __logger = logging.getLogger(__name__)
         self.__json = _json
         self.brokers = sorted([ int(b) for b in _json["brokers"].split(',') ])
         self.new_replication_factor = int(_json["new_replication_factor"]) if _json.has_key("new_replication_factor") else -1
@@ -165,6 +176,20 @@ class ReassignmentOptimizerConfig:
             self.total_replicas = sum([ len(p["replicas"]) for p in _json["partitions"]["partitions"] ], 0)
         self.balanced_load_min = int(math.floor(1.0*self.total_replicas / len(self.brokers)))
         self.balanced_load_max = int(math.ceil(1.0*self.total_replicas / len(self.brokers)))
+
+        self.pinned_replicas = None
+        __pinned_replicas = dict()
+        if self.__json.has_key("pinned_replicas"):
+            for j in self.__json["pinned_replicas"]:
+                t = j["topic"]
+                p = j["partition"]
+                r = j["replica"]
+                if not __pinned_replicas.has_key((t,p,r)):
+                    if (t,p,r) in self.tpbs:
+                        __pinned_replicas[(t,p,r)] = 1 # the value is meaningless.
+                    else:
+                        __logger.warning("broker %s will be vanished in proposed assinment!! replica %s of partition (%s, %s) won't be pinned in proposed assignment!!" % (r, t, p))
+        self.pinned_replicas = __pinned_replicas
 
     #     _pweight = dict()
     #     for (t,p) in self.tps:
