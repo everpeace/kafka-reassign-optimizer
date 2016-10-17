@@ -32,7 +32,7 @@ balanced_load_max= 2
 # Binary Integer Programming
 Minimize Parition Replica Movement for Partition Reassignment:
 MINIMIZE
-1*message_0_B4 + 1*message_0_B5 + 1*message_1_B4 + 1*message_1_B5 + 1*message_2_B4 + 1*message_2_B5 + 0
+-0.5*message_0_B1 + -0.5*message_0_B2 + -0.5*message_0_B3 + 0.5*message_0_B4 + 0.5*message_0_B5 + -0.5*message_1_B1 + -0.5*message_1_B2 + -0.5*message_1_B3 + 0.5*message_1_B4 + 0.5*message_1_B5 + -0.5*message_2_B1 + -0.5*message_2_B2 + -0.5*message_2_B3 + 0.5*message_2_B4 + 0.5*message_2_B5 + 4.5
 SUBJECT TO
 number_or_total_replicas_is_9: message_0_B1 + message_0_B2 + message_0_B3
  + message_0_B4 + message_0_B5 + message_1_B1 + message_1_B2 + message_1_B3
