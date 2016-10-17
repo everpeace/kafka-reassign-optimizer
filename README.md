@@ -10,6 +10,7 @@ This small python script:
 * and the optimization problem is solved by [PuLP](https://pythonhosted.org/PuLP/index.html)
 * (optional) you can
   * pin some specific replicas to specific brokers. (see [sample_input_with_pinned_replicas.json](sample_input_with_pinned_replicas.json)).  This would be useful when you don't want to move leader replicas.
+  * penalize partition movements by setting your own weights for partitions. (default is `1.0` for all partitions), (see [sample_input_with_penalized_move.json.json](sample_input_with_penalized_move.json))
 
 # How to try?
 # on Docker (preferred)

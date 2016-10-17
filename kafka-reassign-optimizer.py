@@ -62,9 +62,10 @@ def propose_assignment_with_minimum_move(config):
     num_movement = 0
     for (t,p,b) in config.tpbs:
         if config.current_assignment[(t,p,b)] == 0:
-            # num_movement += config.partition_weight[(t,p)] * proposed_assignment[(t,p,b)]
-            num_movement += proposed_assignment[(t,p,b)]
-    problem += num_movement
+            num_movement += proposed_assignment[(t,p,b)] * config.parition_move_weight[(t,p)]
+        else:
+            num_movement += ((proposed_assignment[(t,p,b)] - 1) * -1 * config.parition_move_weight[(t, p)])
+    problem += (num_movement / 2.0)
 
     #
     # constraints
@@ -190,6 +191,22 @@ class ReassignmentOptimizerConfig:
                     else:
                         __logger.warning("broker %s will be vanished in proposed assinment!! replica %s of partition (%s, %s) won't be pinned in proposed assignment!!" % (r, t, p))
         self.pinned_replicas = __pinned_replicas
+
+        self.parition_move_weight = None
+        __parition_move_weight = dict()
+        if self.__json.has_key("parition_move_weight"):
+            for j in self.__json["parition_move_weight"]:
+                t = j["topic"]
+                p = j["partition"]
+                w = j["weight"]
+                if not __parition_move_weight.has_key((t,p)):
+                    if (t,p) in self.tps:
+                        __parition_move_weight[(t,p)] = w
+        else:
+            # defualt movement weight is all one.
+            for (t,p) in self.tps:
+                __parition_move_weight[(t,p)] = 1.0
+        self.parition_move_weight = __parition_move_weight
 
     #     _pweight = dict()
     #     for (t,p) in self.tps:

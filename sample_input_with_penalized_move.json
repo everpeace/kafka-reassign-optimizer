@@ -1,0 +1,21 @@
+{
+  "brokers": "1,2,3,4,5",
+  "partitions": {
+    "version": 1,
+    "partitions": [
+      { "topic": "message", "partition": 0, "replicas": [ 1, 2, 3] },
+      { "topic": "message", "partition": 1, "replicas": [ 1, 2, 3] },
+      { "topic": "message", "partition": 2, "replicas": [ 1, 2, 3] }
+    ]
+  },
+  "parition_move_weight": [
+      { "topic": "message", "partition": 0, "weight": 128 },
+      { "topic": "message", "partition": 1, "weight": 64 },
+      { "topic": "message", "partition": 2, "weight": 32 }
+  ],
+  "pinned_replicas": [
+      { "topic": "message", "partition": 0, "replica": 3 },
+      { "topic": "message", "partition": 1, "replica": 2 },
+      { "topic": "message", "partition": 2, "replica": 1 }
+  ]
+}
