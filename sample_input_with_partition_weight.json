@@ -12,7 +12,7 @@
       { "topic": "message", "partition": 2, "replicas": [ 1, 2, 3] }
     ]
   },
-  "parition_weight": [
+  "partition_weights": [
       { "topic": "message", "partition": 0, "weight": 128 },
       { "topic": "message", "partition": 1, "weight": 64 },
       { "topic": "message", "partition": 2, "weight": 32 }

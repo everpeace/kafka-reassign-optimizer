@@ -34,7 +34,7 @@ from itertools import groupby, product
 import json
 import pulp
 
-BALANCE_MIN_FACTOR = 1.5
+BALANCE_MIN_FACTOR = 0.5
 BALANCE_MAX_FACTOR = 2.0
 
 def propose_assignment_with_minimum_move(config):
@@ -70,9 +70,9 @@ def propose_assignment_with_minimum_move(config):
     num_movement = 0
     for (t,p,b) in config.tpbs:
         if config.current_assignment[(t,p,b)] == 0:
-            num_movement += proposed_assignment[(t,p,b)] * config.parition_weight[(t,p)]
+            num_movement += proposed_assignment[(t,p,b)] * config.partition_weights[(t,p)]
         else:
-            num_movement += ((proposed_assignment[(t,p,b)] - 1) * -1 * config.parition_weight[(t, p)])
+            num_movement += ((proposed_assignment[(t,p,b)] - 1) * -1 * config.partition_weights[(t, p)])
     problem += (num_movement / 2.0)
 
     #
@@ -81,7 +81,7 @@ def propose_assignment_with_minimum_move(config):
     # c1: total_replicas
     _total_replica_weight = 0
     for (t, p, b) in config.tpbs:
-        _total_replica_weight += config.parition_weight[(t,p)] * proposed_assignment[(t,p,b)]
+        _total_replica_weight += config.partition_weights[(t,p)] * proposed_assignment[(t,p,b)]
     problem += _total_replica_weight == config.total_replica_weight, "total replicas weight is %s" % config.total_replica_weight
 
     # c2: each partition has replication factor
@@ -100,7 +100,7 @@ def propose_assignment_with_minimum_move(config):
     for b in config.brokers:
         score = 0
         for (t, p) in config.tps:
-            score += config.parition_weight[(t,p)] * proposed_assignment[(t, p, b)]
+            score += config.partition_weights[(t,p)] * proposed_assignment[(t, p, b)]
         if config.balanced_load_max == config.balanced_load_min:
             problem += score == config.balanced_load_max, "load of broker %s is balanced." % b
         else:
@@ -142,7 +142,7 @@ def assignment_str(config, _assignment):
     for (t,p) in config.tps:
         str.append("%s_%s\t" % (t, p))
         for b in config.brokers:
-            v = config.parition_weight[(t,p)] if _assignment[(t,p,b)] == 1 else 0
+            v = config.partition_weights[(t,p)] if _assignment[(t,p,b)] == 1 else 0
             str.append("%s\t" % v)
         str.append("\n")
     return ''.join(str)
@@ -199,21 +199,21 @@ class ReassignmentOptimizerConfig:
                         __logger.warning("broker %s will be vanished in proposed assinment!! replica %s of partition (%s, %s) won't be pinned in proposed assignment!!" % (r, t, p))
         self.pinned_replicas = __pinned_replicas
 
-        self.parition_weight = None
-        __parition_weight = dict()
-        if self.__json.has_key("parition_weight"):
-            for j in self.__json["parition_weight"]:
+        self.partition_weights = None
+        __partition_weights = dict()
+        if self.__json.has_key("partition_weights"):
+            for j in self.__json["partition_weights"]:
                 t = j["topic"]
                 p = j["partition"]
                 w = j["weight"]
-                if not __parition_weight.has_key((t,p)):
+                if not __partition_weights.has_key((t,p)):
                     if (t,p) in self.tps:
-                        __parition_weight[(t,p)] = w
+                        __partition_weights[(t,p)] = w
         else:
             # defualt movement weight is all one.
             for (t,p) in self.tps:
-                __parition_weight[(t,p)] = 1.0
-        self.parition_weight = __parition_weight
+                __partition_weights[(t,p)] = 1.0
+        self.partition_weights = __partition_weights
 
         if self.__json.has_key("balance_parameters"):
             if self.__json["balance_parameters"].has_key("min_factor"):
@@ -231,7 +231,7 @@ class ReassignmentOptimizerConfig:
         self.total_replica_weight = 0
         for (t,p,b) in self.tpbs:
             if self.current_assignment[(t,p,b)] == 1:
-                self.total_replica_weight += __parition_weight[(t,p)]
+                self.total_replica_weight += __partition_weights[(t,p)]
 
         self.balanced_load_min = (self.total_replica_weight / len(self.brokers)) * self.balance_min_factor
         self.balanced_load_max = (self.total_replica_weight / len(self.brokers)) * self.balance_max_factor
