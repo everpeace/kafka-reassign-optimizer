@@ -8,6 +8,10 @@ kafka-reassign-optimizer.py
     current_partition_replica_assignment.json is like below:
     {
       "brokers": "1,2,3,4,5,6",
+      "balance_parameters": {
+        "min_factor": 0.5,
+        "max_factor": 1.5
+      }
       "partitions": {
         "version": 1,
         "partitions": [
@@ -29,6 +33,9 @@ import math
 from itertools import groupby, product
 import json
 import pulp
+
+BALANCE_MIN_FACTOR = 1.5
+BALANCE_MAX_FACTOR = 2.0
 
 def propose_assignment_with_minimum_move(config):
     logger.info("# Configurations for reassignment partition replicas")
@@ -208,13 +215,26 @@ class ReassignmentOptimizerConfig:
                 __parition_weight[(t,p)] = 1.0
         self.parition_weight = __parition_weight
 
+        if self.__json.has_key("balance_parameters"):
+            if self.__json["balance_parameters"].has_key("min_factor"):
+                self.balance_min_factor = self.__json["balance_parameters"]["min_factor"]
+            else:
+                self.balance_max_factor = BALANCE_MAX_FACTOR
+            if self.__json["balance_parameters"].has_key("max_factor"):
+                self.balance_max_factor = self.__json["balance_parameters"]["max_factor"]
+            else:
+                self.balance_max_factor = BALANCE_MAX_FACTOR
+        else:
+            self.balance_max_factor = BALANCE_MAX_FACTOR
+            self.balance_min_factor = BALANCE_MIN_FACTOR
+
         self.total_replica_weight = 0
         for (t,p,b) in self.tpbs:
             if self.current_assignment[(t,p,b)] == 1:
                 self.total_replica_weight += __parition_weight[(t,p)]
 
-        self.balanced_load_min = (self.total_replica_weight / len(self.brokers)) * 0.5
-        self.balanced_load_max = (self.total_replica_weight / len(self.brokers)) * 1.5
+        self.balanced_load_min = (self.total_replica_weight / len(self.brokers)) * self.balance_min_factor
+        self.balanced_load_max = (self.total_replica_weight / len(self.brokers)) * self.balance_max_factor
 
     #     _pweight = dict()
     #     for (t,p) in self.tps:
