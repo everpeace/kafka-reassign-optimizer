@@ -39,6 +39,7 @@ def propose_assignment_with_minimum_move(config):
     logger.info("partitions=%s", [ (t, len(config.topic2partition[t])) for t in config.topic2partition ])
     logger.info("total_partitions= %s", config.total_partitions)
     logger.info("total_replicas_to_assign= %s", config.total_replicas)
+    logger.info("total_replica_weight= %s", config.total_replica_weight)
     if config.pinned_replicas:
         logger.info("pinned parition replica: %s", config.pinned_replicas)
     if config.balanced_load_min == config.balanced_load_max:
@@ -62,19 +63,19 @@ def propose_assignment_with_minimum_move(config):
     num_movement = 0
     for (t,p,b) in config.tpbs:
         if config.current_assignment[(t,p,b)] == 0:
-            num_movement += proposed_assignment[(t,p,b)] * config.parition_move_weight[(t,p)]
+            num_movement += proposed_assignment[(t,p,b)] * config.parition_weight[(t,p)]
         else:
-            num_movement += ((proposed_assignment[(t,p,b)] - 1) * -1 * config.parition_move_weight[(t, p)])
+            num_movement += ((proposed_assignment[(t,p,b)] - 1) * -1 * config.parition_weight[(t, p)])
     problem += (num_movement / 2.0)
 
     #
     # constraints
     #
     # c1: total_replicas
-    _total_replicas = 0
+    _total_replica_weight = 0
     for (t, p, b) in config.tpbs:
-        _total_replicas += proposed_assignment[(t,p,b)]
-    problem += _total_replicas == config.total_replicas, "number or total replicas is %s" % config.total_replicas
+        _total_replica_weight += config.parition_weight[(t,p)] * proposed_assignment[(t,p,b)]
+    problem += _total_replica_weight == config.total_replica_weight, "total replicas weight is %s" % config.total_replica_weight
 
     # c2: each partition has replication factor
     for (t, p) in config.tps:
@@ -92,7 +93,7 @@ def propose_assignment_with_minimum_move(config):
     for b in config.brokers:
         score = 0
         for (t, p) in config.tps:
-            score += proposed_assignment[(t, p, b)]
+            score += config.parition_weight[(t,p)] * proposed_assignment[(t, p, b)]
         if config.balanced_load_max == config.balanced_load_min:
             problem += score == config.balanced_load_max, "load of broker %s is balanced." % b
         else:
@@ -134,7 +135,8 @@ def assignment_str(config, _assignment):
     for (t,p) in config.tps:
         str.append("%s_%s\t" % (t, p))
         for b in config.brokers:
-            str.append("%s\t" % int(_assignment[(t,p,b)]))
+            v = config.parition_weight[(t,p)] if _assignment[(t,p,b)] == 1 else 0
+            str.append("%s\t" % v)
         str.append("\n")
     return ''.join(str)
 
@@ -175,8 +177,6 @@ class ReassignmentOptimizerConfig:
             self.total_replicas = total_partitions * new_replication_factor
         else:
             self.total_replicas = sum([ len(p["replicas"]) for p in _json["partitions"]["partitions"] ], 0)
-        self.balanced_load_min = int(math.floor(1.0*self.total_replicas / len(self.brokers)))
-        self.balanced_load_max = int(math.ceil(1.0*self.total_replicas / len(self.brokers)))
 
         self.pinned_replicas = None
         __pinned_replicas = dict()
@@ -192,21 +192,29 @@ class ReassignmentOptimizerConfig:
                         __logger.warning("broker %s will be vanished in proposed assinment!! replica %s of partition (%s, %s) won't be pinned in proposed assignment!!" % (r, t, p))
         self.pinned_replicas = __pinned_replicas
 
-        self.parition_move_weight = None
-        __parition_move_weight = dict()
-        if self.__json.has_key("parition_move_weight"):
-            for j in self.__json["parition_move_weight"]:
+        self.parition_weight = None
+        __parition_weight = dict()
+        if self.__json.has_key("parition_weight"):
+            for j in self.__json["parition_weight"]:
                 t = j["topic"]
                 p = j["partition"]
                 w = j["weight"]
-                if not __parition_move_weight.has_key((t,p)):
+                if not __parition_weight.has_key((t,p)):
                     if (t,p) in self.tps:
-                        __parition_move_weight[(t,p)] = w
+                        __parition_weight[(t,p)] = w
         else:
             # defualt movement weight is all one.
             for (t,p) in self.tps:
-                __parition_move_weight[(t,p)] = 1.0
-        self.parition_move_weight = __parition_move_weight
+                __parition_weight[(t,p)] = 1.0
+        self.parition_weight = __parition_weight
+
+        self.total_replica_weight = 0
+        for (t,p,b) in self.tpbs:
+            if self.current_assignment[(t,p,b)] == 1:
+                self.total_replica_weight += __parition_weight[(t,p)]
+
+        self.balanced_load_min = (self.total_replica_weight / len(self.brokers)) * 0.5
+        self.balanced_load_max = (self.total_replica_weight / len(self.brokers)) * 1.5
 
     #     _pweight = dict()
     #     for (t,p) in self.tps:
