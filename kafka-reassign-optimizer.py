@@ -34,8 +34,8 @@ from itertools import groupby, product
 import json
 import pulp
 
-BALANCE_MIN_FACTOR = 0.5
-BALANCE_MAX_FACTOR = 2.0
+BALANCE_MIN_FACTOR = 0.9
+BALANCE_MAX_FACTOR = 1.1
 
 def propose_assignment_with_minimum_move(config):
     logger.info("# Configurations for reassignment partition replicas")
@@ -233,8 +233,8 @@ class ReassignmentOptimizerConfig:
             if self.current_assignment[(t,p,b)] == 1:
                 self.total_replica_weight += __partition_weights[(t,p)]
 
-        self.balanced_load_min = (self.total_replica_weight / len(self.brokers)) * self.balance_min_factor
-        self.balanced_load_max = (self.total_replica_weight / len(self.brokers)) * self.balance_max_factor
+        self.balanced_load_min = int(math.floor(self.total_replica_weight / len(self.brokers) * self.balance_min_factor))
+        self.balanced_load_max = int(math.ceil(self.total_replica_weight / len(self.brokers) * self.balance_max_factor))
 
     #     _pweight = dict()
     #     for (t,p) in self.tps:
