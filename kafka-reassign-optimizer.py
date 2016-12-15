@@ -33,6 +33,7 @@ import math
 from itertools import groupby, product
 import json
 import pulp
+import random
 
 BALANCE_MIN_FACTOR = 0.9
 BALANCE_MAX_FACTOR = 1.1
@@ -268,6 +269,9 @@ if __name__ == '__main__':
         for b in reassignment_config.brokers:
             if int(proposed_assignment[(t,p,b)].value()) == 1:
                 replicas.append(b)
+        # currently proposed_assignment returns sorted replica list and this is quick hack to distribute leader node and preffered node.
+        # TODO: select leaders according to the current status and the cluster balance.
+        random.shuffle(replicas)
         proposed_assignment_json["partitions"].append({
             "topic": t,
             "partition": int(p),
