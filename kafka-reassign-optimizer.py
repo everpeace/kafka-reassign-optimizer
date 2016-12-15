@@ -263,7 +263,7 @@ if __name__ == '__main__':
 
     logger.info("")
     logger.info("# Partition Replica Assignment (copy it and input to kafka-reassign-partition.sh)")
-    proposed_assignment_json = { 'vertion': 1, 'partitions':[] }
+    proposed_assignment_json = { 'version': 1, 'partitions':[] }
     for (t, p) in reassignment_config.tps:
         replicas = []
         for b in reassignment_config.brokers:
