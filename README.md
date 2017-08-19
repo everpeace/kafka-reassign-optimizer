@@ -332,3 +332,9 @@ CONSTRAINTS:
 - install lpsolve and jni library by refering [here](https://github.com/vagmcs/Optimus/blob/master/docs/building_and_linking.md#optional-lpsolve-installation)
 - assume all needed libraries will be installed at `/usr/local/lib`
 - hit `make test`
+
+# Release Note
+* `0.3.0`: initial public release
+* `0.2.0`: closed release (heavily experimental)
+* `0.1.0`: closed release (heavily experimental)
+* originally developed by python (preserved in [this branch](https://github.com/everpeace/kafka-reassign-optimizer/tree/old-python-version))
