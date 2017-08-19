@@ -320,3 +320,8 @@ CONSTRAINTS:
       * `(balancedFactorMin * idealBalancedWeight) <= (replica weight of the broker) <= (alancedFactorMax * idealBalancedWeight)`
     * because perfect balance can't be achieved in general.
   
+
+# How to test locally?
+- install lpsolve and jni library by refering [here](https://github.com/vagmcs/Optimus/blob/master/docs/building_and_linking.md#optional-lpsolve-installation)
+- assume all needed libraries will be installed at `/usr/local/lib`
+- hit `sbt ';set javaOptions in Test  += "-Djava.library.path=/usr/local/lib"; test'`

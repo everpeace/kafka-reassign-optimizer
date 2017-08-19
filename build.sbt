@@ -15,6 +15,7 @@ lazy val root = (project in file(".")).
     ) ++ Circe.all ++ Seq(
       scalaTest % Test
     ),
+    fork in Test := true,
     mainClass in Compile := Some("com.github.everpeace.kafka.reassign_optimizer.Main"),
     dockerBaseImage := "everpeace/lpsolve-java:0.0.1",
     dockerUpdateLatest := true,
