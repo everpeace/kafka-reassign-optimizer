@@ -5,7 +5,6 @@ lazy val root = (project in file(".")).
   settings(
     organization := "com.github.everpeace",
     name := "kafka-reassign-optimizer",
-    version := "0.1.0-SNAPSHOT",
     scalaVersion := "2.11.8",
     libraryDependencies ++= Seq(
       Scopt,
@@ -21,3 +20,19 @@ lazy val root = (project in file(".")).
     dockerUpdateLatest := true,
     dockerRepository := Some("everpeace")
   )
+
+import ReleaseTransformations._
+releaseProcess := Seq[ReleaseStep](
+  checkSnapshotDependencies,              // : ReleaseStep
+  inquireVersions,                        // : ReleaseStep
+  runClean,                               // : ReleaseStep
+  runTest,                                // : ReleaseStep
+  setReleaseVersion,                      // : ReleaseStep
+  commitReleaseVersion,                   // : ReleaseStep, performs the initial git checks
+  tagRelease,                             // : ReleaseStep
+  runClean,
+  ReleaseStep(releaseStepTask(publish in Docker)),
+  setNextVersion,                         // : ReleaseStep
+  commitNextVersion,                      // : ReleaseStep
+  pushChanges                             // : ReleaseStep, also checks that an upstream branch is properly configured
+)
