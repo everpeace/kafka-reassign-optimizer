@@ -62,7 +62,7 @@ Usage: kafka-reassign-optimizer [options]
 - and will execute/verify the reassignment.
 
 ```
-$ docker run -it --rm --net host everpeace/kafka-reassign-optimizer --zookeeper 127.0.0.1:2181 --brokers 1,2,3,4,5
+$ docker run -it --rm --net host everpeace/kafka-reassign-optimizer --print-assignment --zookeeper 127.0.0.1:2181 --brokers 1,2,3,4,5
 
 #
 # Summary of Current Partition Assignment
@@ -179,7 +179,7 @@ Reassignment execution successfully finished!
 - and you will shutdown broker `2,3`
 
 ```
-$ docker run -it --rm --net host everpeace/kafka-reassign-optimizer --zookeeper 127.0.0.1:2181 --brokers 1,4,5
+$ docker run -it --rm --net host everpeace/kafka-reassign-optimizer --print-assignment --zookeeper 127.0.0.1:2181 --brokers 1,4,5
 
 #
 # Summary of Current Partition Assignment

@@ -7,7 +7,7 @@ case class Config(
                    zkString: String ="",
                    newBrokers: Set[Int] = Set.empty,
                    topics: Set[String] = Set.empty,
-                   printAssignment: Boolean = true,
+                   printAssignment: Boolean = false,
                    balancedFactorMin: Double = 0.9d,
                    balancedFactorMax: Double = 1.0d,
                    execute: Boolean = true,
