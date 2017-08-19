@@ -11,8 +11,7 @@ This program:
     * replication factor for each topic-partition does not change.
 * by formalizing this problem as Mixed Binary Integer Programming. see [below](#Formulation)
 * and the optimization problem is solved by [Optimus](https://github.com/vagmcs/Optimus)
-* is already packaged as a [docker image](https://hub.docker.com/r/everpeace/kafka-reassign-optimizer/) 
-.  it just works by hitting docker command.
+* is already packaged as a [docker image](https://hub.docker.com/r/everpeace/kafka-reassign-optimizer/).  it just works by hitting docker command.
 * execution and verification of partition reassignment are supported.
 * this can be used for both expanding and shrinking case!!
  
@@ -33,8 +32,7 @@ Usage: kafka-reassign-optimizer [options]
   --brokers id1,id2,...    broker ids to which replicas re distributed to
   --topics topic1,topic2,...
                            target topics (all topics when not specified)
-  --print-assignment <value>
-                           print assignment matrix. please noted this might make huge output when there are a lot topic-partitions (default = true)
+  --print-assignment       print assignment matrix. please noted this might make huge output when there are a lot topic-partitions (default = false)
   --balanced-factor-min <value>
                            stretch factor to decide new assignment is well-balanced (must be <= 1.0, default = 0.9)
   --balanced-factor-max <value>

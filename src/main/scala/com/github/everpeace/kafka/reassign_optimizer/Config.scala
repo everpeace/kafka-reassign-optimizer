@@ -35,9 +35,9 @@ object Config {
       .valueName("topic1,topic2,...")
       .action((topics, c) => c.copy(topics = topics.toSet))
 
-    opt[Boolean]("print-assignment")
+    opt[Unit]("print-assignment")
       .text(s"print assignment matrix. please noted this might make huge output when there are a lot topic-partitions (default = ${default.printAssignment})")
-      .action((p, c) => c.copy(printAssignment = p))
+      .action((_, c) => c.copy(printAssignment = true))
 
     opt[Double]("balanced-factor-min")
       .text(s"stretch factor to decide new assignment is well-balanced (must be <= 1.0, default = ${default.balancedFactorMin})")
