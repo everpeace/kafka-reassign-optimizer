@@ -18,8 +18,8 @@ This small python script:
 [Docker image](https://hub.docker.com/r/everpeace/kafka-reassign-optimizer/) is available and you can start using this so easily.
 
 ```
-$ docker pull everpeace/kafka-reassign-optimizer
-$ docker run -i -e 'LOGLEVEL=debug' everpeace/kafka-reassign-optimizer < ./sample_input.json
+$ docker pull everpeace/kafka-reassign-optimizer:old-python-version
+$ docker run -i -e 'LOGLEVEL=debug' everpeace/kafka-reassign-optimizer:old-python-version < ./sample_input.json
 # Configurations for reassignment partition replicas
 brokers= [1, 2, 3, 4, 5]
 topics= [u'message']
