@@ -1,1 +1,4 @@
 .python-version
+.idea
+target
+*.log
