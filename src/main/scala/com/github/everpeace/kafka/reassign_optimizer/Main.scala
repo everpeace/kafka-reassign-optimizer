@@ -76,9 +76,6 @@ object Main extends App {
       println("# Summary of Proposed Partition Assignment")
       println("#")
       println(s"Is Solution Optimal?: ${solverStatus}")
-      if (solverStatus != ProblemStatus.OPTIMAL) {
-        println(s"!!WARNING: Solution is ${solverStatus}. DON'T execute below assignment plan!!!".toUpperCase)
-      }
       println(s"Total Replica Weights: ${problem.totalReplicaWeight}")
       println(s"Replica Move Amount: ${moveAmount}")
       println(s"New Broker Set: ${newBrokers.toList.sorted.mkString(",")}")
@@ -87,6 +84,10 @@ object Main extends App {
         println("Proposed Partition Assignment:")
       println(problem.showAssignment(newAssignment))
 
+      if (solverStatus != ProblemStatus.OPTIMAL) {
+        println(s"!!Solution is ${solverStatus}. Aborted!!".toUpperCase)
+        sys.exit(0)
+      }
 
       println("\n#")
       println("# Proposed Assignment")

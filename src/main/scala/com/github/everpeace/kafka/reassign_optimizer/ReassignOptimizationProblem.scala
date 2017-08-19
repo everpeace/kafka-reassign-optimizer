@@ -11,27 +11,27 @@ import optimus.optimization.{ProblemStatus, _}
   * This class formulates and solve the linear programming of partition reassignment.
   *
   * VARIABLES:
-  * {topic}_{partition}_on_{broker_id} for each topic-partition and broker
-  * 1 -> replica of the topic partition is assigned to broker_id
-  * 0 -> replica of the topic partition is NOT assigned to broker_id
+  *   {topic}_{partition}_on_{broker_id} for each topic-partition and broker
+  *   1 -> replica of the topic partition is assigned to broker_id
+  *   0 -> replica of the topic partition is NOT assigned to broker_id
   *
   * SUBJECT_TO:
-  * minimize total amount of replica movement, which is calculated from given weight.
+  *   minimize total amount of replica movement, which is calculated from given weight.
   *
   * CONSTRAINTS:
   * C0: for each topic-partition, leader doesn't change unless new broker includes original leader.
-  * (This can be done by restricting domain of variable.  [1,1] for pinned replica, [0,1] for free replica.)
+  *     (This can be done by restricting domain of variable.  [1,1] for pinned replica, [0,1] for free replica.)
   * C1: total replica weight doesn't change.
   * C2: replication factor for each topic-partition doesn't change
   * C3: new assignment is "well balanced"
-  * for each broker, total replica weight assigned to the broker is well balanced.
-  * "well balanced" means that
-  * (balancedFactorMin * idealBalancedWeight) <= (replica weight of the broker) <= (alancedFactorMax * idealBalancedWeight)
-  * because in general perfect balance can't be achieved.
+  *     for each broker, total replica weight assigned to the broker is well balanced.
+  *     "well balanced" means that
+  *     (balancedFactorMin * idealBalancedWeight) <= (replica weight of the broker) <= (alancedFactorMax * idealBalancedWeight)
+  *     because in general perfect balance can't be achieved.
   *
   * @param topicPartitionInfos current topic-partition infos
   * @param newBrokers          brokers to which topic-partition replicas are distributed
-  * @param partitionWeights             weights for each topic-partition
+  * @param partitionWeights    weights for each topic-partition
   * @param balancedFactorMin   stretch factor (must be <= 1.0) for deciding solution is balanced. see above for details.
   * @param balancedFactorMax   stretch factor (must be >= 1.0) for deciding solution is balanced. see above for details.
   * @param solverLib           solver lib that will be used.
@@ -170,37 +170,43 @@ case class ReassignOptimizationProblem(topicPartitionInfos: List[TopicPartitionI
     start();
     release()
 
-    if (problem.getStatus != ProblemStatus.OPTIMAL)
-      println(s"!!WARNING: Solution is ${problem.getStatus}. Please DON'T use proposed assignment!!".toUpperCase)
-
     // transform variables to assignment
-    val newAssignment: ReplicaAssignment = for {
-      tpVars <- assignmentVariables.toList.groupBy(a => a._1._1 -> a._1._2)
-    } yield {
-      val ((t, p), intVars) = tpVars
-      val replicas = intVars.flatMap {
-        case ((_, _, b), intVar) =>
-          intVar.value match {
-            case Some(a) if a == 1.0 => List(b)
-            case Some(a) if a == 0.0 => List.empty
-            case None => List.empty
-          }
+    val newAssignment: ReplicaAssignment = if (problem.getStatus == ProblemStatus.OPTIMAL) {
+      for {
+        tpVars <- assignmentVariables.toList.groupBy(a => a._1._1 -> a._1._2)
+      } yield {
+        val ((t, p), intVars) = tpVars
+        val replicas = intVars.flatMap {
+          case ((_, _, b), intVar) =>
+            intVar.value match {
+              case Some(a) if a == 1.0 => List(b)
+              case Some(a) if a == 0.0 => List.empty
+              case None => List.empty
+            }
+        }
+        val leader = currentReplicaAssignment((t, p)).head // head of replicas should be leader.
+        if (newBrokers.contains(leader)) {
+          // we have to keep leader being preferred replica.
+          (t, p) -> (leader +: replicas.filterNot(_ == leader))
+        } else {
+          // if previous leader is absent on new broker set
+          // we shuffle replica assignment to make new leader will be randomly distributed.
+          val shuffled = scala.util.Random.shuffle(replicas)
+          println(s"!!WARNING: leader will change in new assignment!! ".toUpperCase + s"${(t, p)}: current=${leader}, new=${shuffled.head}")
+          (t, p) -> shuffled
+        }
       }
-      val leader = currentReplicaAssignment((t, p)).head // head of replicas should be leader.
-      if (newBrokers.contains(leader)) {
-        // we have to keep leader being preferred replica.
-        (t, p) -> (leader +: replicas.filterNot(_ == leader))
-      } else {
-        // if previous leader is absent on new broker set
-        // we shuffle replica assignment to make new leader will be randomly distributed.
-        val shuffled = scala.util.Random.shuffle(replicas)
-        println(s"!!WARNING: leader will change in new assignment!! ".toUpperCase + s"${(t, p)}: current=${leader}, new=${shuffled.head}")
-        (t, p) -> shuffled
-      }
+    } else {
+      Map.empty
     }
 
-    val moves = moveAmount(currentReplicaAssignment, newAssignment)
-    val weights = brokerWeights(newAssignment)
+    val moves = if (problem.getStatus == ProblemStatus.OPTIMAL)
+      moveAmount(currentReplicaAssignment, newAssignment)
+    else 0
+    val weights = if (problem.getStatus == ProblemStatus.OPTIMAL)
+      brokerWeights(newAssignment)
+    else newBrokers.map(b => b -> 0).toMap
+
     Result(
       problem.getStatus,
       moves,
@@ -247,7 +253,7 @@ case class ReassignOptimizationProblem(topicPartitionInfos: List[TopicPartitionI
 
     Tabulator.format(
       List(brokers) ++ assignmentRows ++ List(weights),
-      if(existsNewLeader) legends ++ List('⚑' -> "new leader partition") else legends
+      if (existsNewLeader) legends ++ List('⚑' -> "new leader partition") else legends
     )
   }
 
