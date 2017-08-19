@@ -1,4 +1,5 @@
 import Dependencies._
+import com.typesafe.sbt.packager.docker._
 
 lazy val root = (project in file(".")).
   enablePlugins(DockerPlugin, JavaAppPackaging).
@@ -19,7 +20,8 @@ lazy val root = (project in file(".")).
     mainClass in Compile := Some("com.github.everpeace.kafka.reassign_optimizer.Main"),
     dockerBaseImage := "everpeace/lpsolve-java:0.0.1",
     dockerUpdateLatest := true,
-    dockerRepository := Some("everpeace")
+    dockerRepository := Some("everpeace"),
+    dockerCommands += Cmd("LABEL","maintainer","everpeace <https://github.com/everpeace/>")
   )
 
 import ReleaseTransformations._
