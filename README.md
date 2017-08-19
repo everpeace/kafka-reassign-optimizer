@@ -60,6 +60,15 @@ Usage: kafka-reassign-optimizer [options]
 - and will execute/verify the reassignment.
 
 ```
+# scenario setup
+$ docker-compose up -d zookeeper kafka1 kafka2 kafka3
+$ docker-compose exec kafka1 kafka-topics \
+  --zookeeper zookeeper:2181 --create --topic tp1 \
+  --partitions 2 --replication-factor 3
+$ docker-compose up -d kafka4 kafka5
+# $ docker-compose down -v # to teardown
+
+# run kafka-reassign-optimizer
 $ docker run -it --rm --net host everpeace/kafka-reassign-optimizer --print-assignment --zookeeper 127.0.0.1:2181 --brokers 1,2,3,4,5
 
 #
