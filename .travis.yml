@@ -24,8 +24,8 @@ script:
       /kafka-reassign-optimizer/.travis_script/install_sbt_and_test.sh
 
   # Tricks to avoid unnecessary cache updates
-  - find $HOME/.sbt -name "*.lock" | xargs rm
-  - find $HOME/.ivy2 -name "ivydata-*.properties" | xargs rm
+  - find $HOME/.sbt -name "*.lock" | sudo xargs rm
+  - find $HOME/.ivy2 -name "ivydata-*.properties" | sudo xargs rm
 
 before_install:
  - |
