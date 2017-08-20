@@ -1,4 +1,6 @@
 # kafka-reassign-optimizer in scala
+[![Build Status](https://travis-ci.org/everpeace/kafka-reassign-optimizer.svg?branch=master)](https://travis-ci.org/everpeace/kafka-reassign-optimizer)
+
 This is strongly inspired by [killerwhile/kafka-assignment-optimizer](https://github.com/killerwhile/kafka-assignment-optimizer).
 
 This program:
@@ -14,7 +16,7 @@ This program:
 * is already packaged as a [docker image](https://hub.docker.com/r/everpeace/kafka-reassign-optimizer/).  it just works by hitting docker command.
 * execution and verification of partition reassignment are supported.
 * this can be used for both expanding and shrinking case!!
- 
+
 # Installation
 just pull the image
 ```
@@ -53,7 +55,7 @@ Usage: kafka-reassign-optimizer [options]
   - it has 2 partitions with replication factor 3.
   - partition replica is distributed on brokers `1, 2, 3`
 - Then, you added two brokers `4,5`
-- `kafka-reassign-optimizer` gives you optimal partition replica reassignment such that 
+- `kafka-reassign-optimizer` gives you optimal partition replica reassignment such that
   - replica movement is only 2
   - replica partition is almost evenly distributed to 5 brokers
   - leader and replication factor for each topic partition does not change
@@ -88,14 +90,14 @@ Current Partition Assignment:
           ⚐   leader partition     
 
 #
-# Finding Optimal Partition Assignment 
+# Finding Optimal Partition Assignment
 # let's find well balanced but minimum partition movements
 #
   ______________________     ______            
-  ___  /___  __ \_  ___/________  /__   ______ 
+  ___  /___  __ \_  ___/________  /__   ______
   __  / __  /_/ /____ \_  __ \_  /__ | / /  _ \
   _  /___  ____/____/ // /_/ /  / __ |/ //  __/
-  /_____/_/     /____/ \____//_/  _____/ \___/ 
+  /_____/_/     /____/ \____//_/  _____/ \___/
 
 Model lpSolve: 13x10
 Configuring variable bounds...
@@ -166,7 +168,7 @@ Successfully started reassignment of partitions {"version":1,"partitions":[{"top
 
 #
 # Verifying Reassignment
-#  interval = 5 seconds 
+#  interval = 5 seconds
 #  timeout  = 5 minutes (until 2017-08-19T17:10:51.694Z)
 #
 Verifying.. (time = 2017-08-19T17:05:51.722Z)
@@ -205,14 +207,14 @@ Current Partition Assignment:
           ⚐   leader partition     
 
 #
-# Finding Optimal Partition Assignment 
+# Finding Optimal Partition Assignment
 # let's find well balanced but minimum partition movements
 #
   ______________________     ______            
-  ___  /___  __ \_  ___/________  /__   ______ 
+  ___  /___  __ \_  ___/________  /__   ______
   __  / __  /_/ /____ \_  __ \_  /__ | / /  _ \
   _  /___  ____/____/ // /_/ /  / __ |/ //  __/
-  /_____/_/     /____/ \____//_/  _____/ \___/ 
+  /_____/_/     /____/ \____//_/  _____/ \___/
 
 Model lpSolve: 13x10
 Configuring variable bounds...
@@ -285,7 +287,7 @@ Successfully started reassignment of partitions {"version":1,"partitions":[{"top
 
 #
 # Verifying Reassignment
-#  interval = 5 seconds 
+#  interval = 5 seconds
 #  timeout  = 5 minutes (until 2017-08-19T17:22:18.980Z)
 #
 Verifying.. (time = 2017-08-19T17:17:19.010Z)
@@ -304,17 +306,17 @@ Reassignment execution successfully finished!
 
 # Partition Replica Reassignment as Binary Integer Programming
 VARIABLES:
-* `{topic}_{partition}_on_{broker_id}` 
+* `{topic}_{partition}_on_{broker_id}`
   * for each topic-partition, broker
-  * it is binary variable (0 or 1). 
+  * it is binary variable (0 or 1).
   * it indicates whether replica of the topic-partition is assigned to the broker or not.
-  
+
 SUBJECT_TO:
   * minimize total amount of replica movement, which is calculated from given weight.
-    * calculating total movement amount from above variables is a bit tricky. see [source](src/main/scala/com/github/everpeace/kafka/reassign_optimizer/ReassignOptimizationProblem.scala) for details. 
+    * calculating total movement amount from above variables is a bit tricky. see [source](src/main/scala/com/github/everpeace/kafka/reassign_optimizer/ReassignOptimizationProblem.scala) for details.
 
 CONSTRAINTS:
-  * __C0__: for each topic-partition, leader does not change unless new broker includes original leader. 
+  * __C0__: for each topic-partition, leader does not change unless new broker includes original leader.
     * This can be done by restricting domain of variable.
       * `[0,1]` for free spot.
       * `[1,1]` for pinned spot
@@ -326,7 +328,7 @@ CONSTRAINTS:
     * "well balanced" means that
       * `(balancedFactorMin * idealBalancedWeight) <= (replica weight of the broker) <= (alancedFactorMax * idealBalancedWeight)`
     * because perfect balance can't be achieved in general.
-  
+
 
 # How to test locally?
 - install lpsolve and jni library by refering [here](https://github.com/vagmcs/Optimus/blob/master/docs/building_and_linking.md#optional-lpsolve-installation)
