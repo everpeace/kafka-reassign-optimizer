@@ -1,5 +1,5 @@
 # kafka-reassign-optimizer in scala
-[![Build Status](https://travis-ci.org/everpeace/kafka-reassign-optimizer.svg?branch=master)](https://travis-ci.org/everpeace/kafka-reassign-optimizer)
+[![Build Status](https://travis-ci.org/everpeace/kafka-reassign-optimizer.svg?branch=master)](https://travis-ci.org/everpeace/kafka-reassign-optimizer) [![Docker Pulls](https://img.shields.io/docker/pulls/everpeace/kafka-reassign-optimizer.svg)](https://hub.docker.com/r/everpeace/kafka-reassign-optimizer/)
 
 This is strongly inspired by [killerwhile/kafka-assignment-optimizer](https://github.com/killerwhile/kafka-assignment-optimizer).
 
@@ -13,7 +13,7 @@ This program:
     * replication factor for each topic-partition does not change.
 * by formalizing this problem as Mixed Binary Integer Programming. see [below](#Formulation)
 * and the optimization problem is solved by [Optimus](https://github.com/vagmcs/Optimus)
-* is already packaged as a [docker image](https://hub.docker.com/r/everpeace/kafka-reassign-optimizer/).  it just works by hitting docker command.
+* is already packaged as a docker image [everpeace/kafka-reassign-optimizer](https://hub.docker.com/r/everpeace/kafka-reassign-optimizer/).  it just works by hitting docker command.
 * execution and verification of partition reassignment are supported.
 * this can be used for both expanding and shrinking case!!
 
