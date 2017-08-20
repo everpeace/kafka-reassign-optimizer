@@ -1,0 +1,45 @@
+cache:
+  directories:
+    - $HOME/.ivy2/cache
+    - $HOME/.sbt/boot/
+    - $HOME/.cache/docker
+
+before_cache:
+  # Tricks to avoid unnecessary cache updates
+  - find $HOME/.ivy2 -name "ivydata-*.properties" -delete
+  - find $HOME/.sbt -name "*.lock" -delete
+
+language: scala
+scala:
+  - 2.11.8
+jdk:
+  - oraclejdk8
+
+script:
+  - |
+    docker run -it \
+      -v $(pwd):/kafka-reassign-optimizer \
+      -v $HOME:/root \
+      everpeace/lpsolve-java \
+      /kafka-reassign-optimizer/.travis_script/install_sbt_and_test.sh
+
+  # Tricks to avoid unnecessary cache updates
+  - find $HOME/.sbt -name "*.lock" | xargs rm
+  - find $HOME/.ivy2 -name "ivydata-*.properties" | xargs rm
+
+before_install:
+ - |
+    sudo apt-get update -qq \
+    && sudo apt-get install -y libaio1
+ - sudo hostname "$(hostname | cut -c1-63)"
+
+os: linux
+dist: trusty
+sudo: required
+services:
+  - docker
+
+branches:
+  only:
+    - master
+    - develop
