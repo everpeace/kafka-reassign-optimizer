@@ -1,7 +1,6 @@
 package com.github.everpeace.kafka.reassign_optimizer
 
-import com.github.everpeace.kafka.reassign_optimizer.ReassignOptimizationProblem.Result
-import com.github.everpeace.kafka.reassign_optimizer.util.Tabulator
+import com.github.everpeace.kafka.reassign_optimizer.ReassignOptimizationProblem.Solution
 import kafka.common.TopicAndPartition
 import optimus.algebra.{Const, Constraint, Expression}
 import optimus.optimization.SolverLib.SolverLib
@@ -30,34 +29,28 @@ import optimus.optimization.{ProblemStatus, _}
   *     because in general perfect balance can't be achieved.
   *
   * @param topicPartitionInfos current topic-partition infos
-  * @param newBrokers          brokers to which topic-partition replicas are distributed
+  * @param targetBrokers       brokers to which topic-partition replicas are distributed
   * @param partitionWeights    weights for each topic-partition
   * @param balancedFactorMin   stretch factor (must be <= 1.0) for deciding solution is balanced. see above for details.
   * @param balancedFactorMax   stretch factor (must be >= 1.0) for deciding solution is balanced. see above for details.
   * @param solverLib           solver lib that will be used.
   */
 case class ReassignOptimizationProblem(topicPartitionInfos: List[TopicPartitionInfo],
-                                       newBrokers: Set[Int],
+                                       targetBrokers: Set[Int],
                                        partitionWeights: TopicAndPartition => Int = { _ => 1 },
                                        balancedFactorMin: Double = 0.9,
                                        balancedFactorMax: Double = 1.0
                                       )(implicit val solverLib: SolverLib) {
   require(balancedFactorMin <= 1.0, "balancedFactorMin should be <= 1.0")
   require(balancedFactorMax >= 1.0, "balancedFactorMax should be >= 1.0")
+  implicit val `this` = this
 
-  // this map's value is replicas and head of replicas should be leader because converted from TopicPartitionInfos
-  val currentReplicaAssignment: ReplicaAssignment = topicPartitionInfos.map(_.assignment).toMap
-  val currentAssignmentByTPB: List[(String, Int, Int)] = for {
-    tp <- currentReplicaAssignment.keys.toList
-    replica <- currentReplicaAssignment(tp)
-  } yield (tp._1, tp._2, replica)
+  val currentAssignment = topicPartitionInfos.assignment
+  val brokersOnProblem = currentAssignment.values.flatten.toSet.union(targetBrokers)
 
-  val brokersOnProblem = currentReplicaAssignment.values.flatten.toSet.union(newBrokers)
-
-  val totalReplicaWeight = currentAssignmentByTPB.map(tpb => partitionWeights(tpb._1 -> tpb._2)).sum.toDouble
-  val givenBrokerWeights = brokerWeights(currentReplicaAssignment)
-  val balancedWeightMin = Math.floor(totalReplicaWeight / newBrokers.size * balancedFactorMin).toInt
-  val balancedWeightMax = Math.ceil(totalReplicaWeight / newBrokers.size * balancedFactorMax).toInt
+  val totalReplicaWeight = currentAssignment.totalReplicaWeight
+  val balancedWeightMin = Math.floor(totalReplicaWeight.toDouble / targetBrokers.size * balancedFactorMin).toInt
+  val balancedWeightMax = Math.ceil(totalReplicaWeight.toDouble / targetBrokers.size * balancedFactorMax).toInt
 
   //
   // problem: it should be mixed-integer problem because variables are boolean(0 or 1)
@@ -68,14 +61,14 @@ case class ReassignOptimizationProblem(topicPartitionInfos: List[TopicPartitionI
   // variables: it should be Integer var.
   //
   val assignmentVariables: Map[(String, Int, Int), MPIntVar] = for {
-    (tp, replicas) <- currentReplicaAssignment
+    (tp, replicas) <- currentAssignment
     broker <- brokersOnProblem
   } yield {
     val varName = s"${tp._1}_${tp._2}_on_$broker"
     val pinned = 1 to 1
     val free = 0 to 1
     val absent = 0 to 0
-    if (!newBrokers.contains(broker)) {
+    if (!targetBrokers.contains(broker)) {
       (tp._1, tp._2, broker) -> MPIntVar(varName, absent)
     } else if (broker == replicas.head) { // head should be leader
       (tp._1, tp._2, broker) -> MPIntVar(varName, pinned)
@@ -93,7 +86,7 @@ case class ReassignOptimizationProblem(topicPartitionInfos: List[TopicPartitionI
       tpb <- assignmentVariables.keys
     } {
       val (t, p, _) = tpb
-      if (currentAssignmentByTPB.contains(tpb)) {
+      if (topicPartitionInfos.tpbPairs.contains(tpb)) {
         move = move + ((assignmentVariables(tpb) - 1) * -1 * partitionWeights((t, p)))
       } else {
         move = move + (assignmentVariables(tpb) * partitionWeights((t, p)))
@@ -118,9 +111,9 @@ case class ReassignOptimizationProblem(topicPartitionInfos: List[TopicPartitionI
 
   val `C2: replication factor for each topic-partition doesn't change`: Map[(String, Int), Constraint] = {
     (for {
-      tp <- currentReplicaAssignment.keys.toList
+      tp <- currentAssignment.keys.toList
     } yield {
-      val currentReplicas = currentReplicaAssignment(tp).length
+      val currentReplicas = currentAssignment(tp).length
       var assignedReplicas: Expression = Const(0.0)
       for {
         b <- brokersOnProblem
@@ -137,12 +130,12 @@ case class ReassignOptimizationProblem(topicPartitionInfos: List[TopicPartitionI
   } yield {
     var brokerWeights: Expression = Const(0.0)
     for {
-      tp <- currentReplicaAssignment.keys.toList
+      tp <- currentAssignment.keys.toList
     } {
       val (t, p) = tp
       brokerWeights = brokerWeights + (assignmentVariables((t, p, b)) * partitionWeights(tp))
     }
-    if (newBrokers.contains(b)) {
+    if (targetBrokers.contains(b)) {
       b -> (brokerWeights >:= balancedWeightMin, brokerWeights <:= balancedWeightMax)
     } else {
       b -> (brokerWeights >:= 0, brokerWeights <:= 0)
@@ -150,7 +143,7 @@ case class ReassignOptimizationProblem(topicPartitionInfos: List[TopicPartitionI
   }).toMap
 
 
-  def solve(): Result = {
+  def solve(): Solution = {
 
     minimize(`total amount of replica movement`)
     add(`C1: total replica weight doesn't change`)
@@ -167,8 +160,22 @@ case class ReassignOptimizationProblem(topicPartitionInfos: List[TopicPartitionI
     start();
     release()
 
-    // transform variables to assignment
-    val newAssignment: ReplicaAssignment = if (problem.getStatus == ProblemStatus.OPTIMAL) {
+    new Solution()
+  }
+}
+
+object ReassignOptimizationProblem {
+
+  class Solution(implicit val problem: ReassignOptimizationProblem) {
+
+    private val mipProblem = problem.problem
+    private val assignmentVariables = problem.assignmentVariables
+    private val targetBrokers = problem.targetBrokers
+
+    def status: ProblemStatus.ProblemStatus = mipProblem.getStatus
+
+    val originalAssignment: ReplicaAssignment = problem.currentAssignment
+    val proposedAssignment: ReplicaAssignment = if (status == ProblemStatus.OPTIMAL) {
       for {
         tpVars <- assignmentVariables.toList.groupBy(a => a._1._1 -> a._1._2)
       } yield {
@@ -181,8 +188,8 @@ case class ReassignOptimizationProblem(topicPartitionInfos: List[TopicPartitionI
               case None => List.empty
             }
         }
-        val leader = currentReplicaAssignment((t, p)).head // head of replicas should be leader.
-        if (newBrokers.contains(leader)) {
+        val leader = originalAssignment((t, p)).head // head of replicas should be leader.
+        if (targetBrokers.contains(leader)) {
           // we have to keep leader being preferred replica.
           (t, p) -> (leader +: replicas.filterNot(_ == leader))
         } else {
@@ -197,85 +204,41 @@ case class ReassignOptimizationProblem(topicPartitionInfos: List[TopicPartitionI
       Map.empty
     }
 
-    val moves = if (problem.getStatus == ProblemStatus.OPTIMAL)
-      moveAmount(currentReplicaAssignment, newAssignment)
+
+    def showProposedAssignment = proposedAssignment.show
+
+    def moveAmount: Int = if (status == ProblemStatus.OPTIMAL)
+      moveAmount(originalAssignment, proposedAssignment)
     else 0
-    val weights = if (problem.getStatus == ProblemStatus.OPTIMAL)
-      brokerWeights(newAssignment)
-    else newBrokers.map(b => b -> 0).toMap
 
-    Result(
-      problem.getStatus,
-      moves,
-      weights,
-      newAssignment
-    )
-  }
+    def brokerWeights = if (status == ProblemStatus.OPTIMAL)
+      proposedAssignment.brokerWeights
+    else problem.brokersOnProblem.map(b => b -> 0).toMap
 
-  def showGivenAssignment: String = showAssignment(currentReplicaAssignment)
-
-  def showAssignment(assignments: ReplicaAssignment): String = {
-    val sortedBrokers = brokersOnProblem.toList.sorted
-    val brokers = List("broker") ++ sortedBrokers.map(_.toString) ++ List("")
-    var existsNewLeader = false
-    val assignmentRows = for {a <- assignments.keys.toList.sorted} yield {
-      val as = sortedBrokers.map { b =>
-        if (assignments(a).contains(b)) {
-          if (assignments(a).head == b && currentReplicaAssignment(a).head == b) {
-            s"⚐${partitionWeights(a)}"
-          }
-          else if (assignments(a).head == b) {
-            existsNewLeader = true
-            s"⚑${partitionWeights(a)}"
-          }
-          else {
-            s" ${partitionWeights(a)}"
-          }
-        } else {
-          " 0"
-        }
-      }
-      List(s"[${a._1}, ${a._2}]") ++ as ++ List(s"(RF = ${as.filterNot(_ == " 0").length})")
+    private def moveCount(old: Set[Int], `new`: Set[Int]) = {
+      require(old.size == `new`.size)
+      // when |old| == |new|  move_cunt = |old - old ∩ new| = |new - old ∩ new|
+      old.diff(`new`)
     }
-    val weights = List("weight") ++ {
-      val w = brokerWeights(assignments)
-      sortedBrokers.map { b =>
-        w(b).toString
-      }
-    } ++ List("")
 
-    val legends = List(
-      '⚐' -> "leader partition"
-    )
-
-    Tabulator.format(
-      List(brokers) ++ assignmentRows ++ List(weights),
-      if (existsNewLeader) legends ++ List('⚑' -> "new leader partition") else legends
-    )
-  }
-
-  def moveAmount(oldP: ReplicaAssignment, newP: ReplicaAssignment): Int = (for {
-    tp <- oldP.keys.toList
-  } yield {
-    oldP(tp).toSet.diff(newP(tp).toSet).size * partitionWeights(tp)
-  }).sum
-
-  def brokerWeights(assignment: ReplicaAssignment): Map[Int, Int] = (for {
-    b <- brokersOnProblem
-  } yield {
-    val ws = for {
-      tp <- assignment.keys.toList
+    private def moveAmount(old: ReplicaAssignment, `new`: ReplicaAssignment): Int = (for {
+      tp <- old.keys.toList
     } yield {
-      if (assignment(tp).contains(b)) partitionWeights(tp)
-      else 0
+      moveCount(old(tp).toSet, `new`(tp).toSet).size * problem.partitionWeights(tp)
+    }).sum
+
+  }
+
+  object Solution {
+
+    def unapply(solution: Solution): Option[(ProblemStatus.ProblemStatus, Int, Map[Int, Int], ReplicaAssignment)] = {
+      val solverStatus = solution.status
+      val moveAmount = solution.moveAmount
+      val brokerWeights = solution.brokerWeights
+      val newAssignment = solution.proposedAssignment
+      Some((solverStatus, moveAmount, brokerWeights, newAssignment))
     }
-    b -> ws.sum
-  }).toMap
 
-}
-
-object ReassignOptimizationProblem {
-
-  case class Result(status: ProblemStatus.ProblemStatus, moveAmount: Int, brokerWeights: Map[Int, Int], newAssignment: ReplicaAssignment)
+  }
 
 }

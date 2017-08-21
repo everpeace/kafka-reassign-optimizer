@@ -3,7 +3,7 @@ package com.github.everpeace.kafka.reassign_optimizer
 import java.time.Instant
 import java.time.temporal.ChronoUnit
 
-import com.github.everpeace.kafka.reassign_optimizer.ReassignOptimizationProblem.Result
+import com.github.everpeace.kafka.reassign_optimizer.ReassignOptimizationProblem.Solution
 import kafka.admin._
 import kafka.common.TopicAndPartition
 import kafka.utils.ZkUtils
@@ -22,6 +22,7 @@ object Main extends App {
   if (configOpt.isEmpty) sys.exit(1)
 
   val config = configOpt.get
+
   import config._
 
   val zk = ZkUtils(zkString, 30000, 30000, JaasUtils.isZkSecurityEnabled)
@@ -48,29 +49,31 @@ object Main extends App {
     case Success(tpis) =>
 
       implicit val lp_solve = SolverLib.lp_solve
-      val problem = ReassignOptimizationProblem(
+      implicit val problem = ReassignOptimizationProblem(
         topicPartitionInfos = tpis,
-        newBrokers = newBrokers,
+        targetBrokers = newBrokers,
         partitionWeights = partitionWeights,
         balancedFactorMin = balancedFactorMin,
         balancedFactorMax = balancedFactorMax
       )
+      val currentAssignment = tpis.assignment
 
       println("\n#")
       println("# Summary of Current Partition Assignment")
       println("#")
       println(s"Total Replica Weights: ${problem.totalReplicaWeight}")
-      println(s"Current Broker Set: ${problem.currentReplicaAssignment.values.flatten.toSet.toList.sorted.mkString(",")}")
-      println(s"Broker Weights: ${ListMap(problem.givenBrokerWeights.toSeq.sortBy(_._1): _*)}")
+      println(s"Current Broker Set: ${currentAssignment.values.flatten.toSet.toList.sorted.mkString(",")}")
+      println(s"Broker Weights: ${ListMap(currentAssignment.brokerWeights.toSeq.sortBy(_._1): _*)}")
       if (printAssignment)
         println("Current Partition Assignment:")
-      println(problem.showGivenAssignment)
+      println(currentAssignment.show)
 
       println("\n#")
       println("# Finding Optimal Partition Assignment ")
       println("# let's find well balanced but minimum partition movements")
       println("#")
-      val Result(solverStatus, moveAmount, brokerWeights, newAssignment) = problem.solve()
+
+      val Solution(solverStatus, moveAmount, brokerWeights, proposedAssignment) = problem.solve()
 
       println("\n#")
       println("# Summary of Proposed Partition Assignment")
@@ -82,7 +85,7 @@ object Main extends App {
       println(s"Broker Weights: ${ListMap(brokerWeights.toSeq.sortBy(_._1): _*)}")
       if (printAssignment)
         println("Proposed Partition Assignment:")
-      println(problem.showAssignment(newAssignment))
+      println(proposedAssignment.show)
 
       if (solverStatus != ProblemStatus.OPTIMAL) {
         println(s"!!Solution is ${solverStatus}. Aborted!!".toUpperCase)
@@ -94,13 +97,15 @@ object Main extends App {
       println("# (You can save below json and pass it to kafka-reassign-partition command)")
       println("#")
       val reassignmentRawJson = zk.formatAsReassignmentJson(
-        ListMap(newAssignment.toSeq.sortBy(_._1): _*)
+        ListMap(proposedAssignment.toSeq.sortBy(_._1): _*)
           .mapKeys(tp => TopicAndPartition(tp._1, tp._2))
       )
 
       import io.circe.parser._
       parse(reassignmentRawJson) match {
-        case Left(e) => println(e)
+        case Left(e) =>
+          println(e)
+          sys.exit(1)
         case Right(j) => println(j.spaces2)
       }
 
@@ -166,9 +171,9 @@ object Main extends App {
       }
     }
     println()
-    if (reassignedPartitionsStatus.values.forall(_ == ReassignmentCompleted)){
+    if (reassignedPartitionsStatus.values.forall(_ == ReassignmentCompleted)) {
       ReassignmentCompleted
-    } else if (reassignedPartitionsStatus.values.exists(_ == ReassignmentInProgress)){
+    } else if (reassignedPartitionsStatus.values.exists(_ == ReassignmentInProgress)) {
       ReassignmentInProgress
     } else {
       ReassignmentFailed
