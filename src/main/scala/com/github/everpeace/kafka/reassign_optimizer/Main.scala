@@ -116,97 +116,27 @@ object Main extends App {
           case false =>
             println("aborted.")
           case true =>
-            println("\n#")
-            println("# Executing Reassignment")
-            println("#")
-            ReassignPartitionsCommand.executeAssignment(zk, reassignmentRawJson)
+
+            OneShotAssignmentExecutor(zk).executeAssignment(proposedAssignment)
 
             if (verify) {
-              val start = Instant.now
-              println("\n#")
-              println("# Verifying Reassignment")
-              println(s"#  interval = ${verifyInterval} ")
-              println(s"#  timeout  = ${verifyTimeout} (until ${start.plus(verifyTimeout.toMillis, ChronoUnit.MILLIS)})")
-              println("#")
-              val b = new Breaks
-              var status: ReassignmentStatus = ReassignmentInProgress
-              b.breakable {
-                while (Instant.now.isBefore(start.plus(verifyTimeout.toMillis, ChronoUnit.MILLIS))) {
-                  val st = verifyAssignment(zk, reassignmentRawJson)
-                  status = st
-                  if (status != ReassignmentInProgress) {
-                    b.break
-                  }
-                  Thread.sleep(verifyInterval.toMillis)
-                }
-                verifyAssignment(zk, reassignmentRawJson)
-                println("Verifying reassignments timeout! Reassignments might be in progress. Check manually.")
-                sys.exit(0)
-              }
+              val status = PollingAssignmentVerifyier(zk, verifyInterval, verifyTimeout)
+                .verify(proposedAssignment)
+
               status match {
                 case ReassignmentCompleted =>
                   println("Reassignment execution successfully finished!")
+                case ReassignmentInProgress =>
+                  println("Verifying reassignments timeout! Reassignments might be in progress. Check manually.")
                 case ReassignmentFailed =>
                   println("Reassignment execution finished! Several reassignments might be failed. Check manually.")
               }
+
             } else {
               println("Reassignment execution finished! Check reassignment progress manually.")
             }
         }
       }
-  }
-
-  def verifyAssignment(zkUtils: ZkUtils, reassignmentJsonString: String): ReassignmentStatus = {
-    println(s"Verifying.. (time = ${Instant.now})")
-    val partitionsToBeReassigned = zkUtils.parsePartitionReassignmentData(reassignmentJsonString)
-    val reassignedPartitionsStatus = checkIfReassignmentSucceeded(zkUtils, partitionsToBeReassigned)
-    reassignedPartitionsStatus.foreach { partition =>
-      partition._2 match {
-        case ReassignmentCompleted =>
-          println("Reassignment of partition %s completed successfully".format(partition._1))
-        case ReassignmentFailed =>
-          println("Reassignment of partition %s failed".format(partition._1))
-        case ReassignmentInProgress =>
-          println("Reassignment of partition %s is still in progress".format(partition._1))
-      }
-    }
-    println()
-    if (reassignedPartitionsStatus.values.forall(_ == ReassignmentCompleted)) {
-      ReassignmentCompleted
-    } else if (reassignedPartitionsStatus.values.exists(_ == ReassignmentInProgress)) {
-      ReassignmentInProgress
-    } else {
-      ReassignmentFailed
-    }
-  }
-
-  private def checkIfReassignmentSucceeded(zkUtils: ZkUtils, partitionsToBeReassigned: Map[TopicAndPartition, Seq[Int]])
-  : Map[TopicAndPartition, ReassignmentStatus] = {
-    val partitionsBeingReassigned = zkUtils.getPartitionsBeingReassigned().mapValues(_.newReplicas)
-    partitionsToBeReassigned.map { topicAndPartition =>
-      (topicAndPartition._1, checkIfPartitionReassignmentSucceeded(zkUtils, topicAndPartition._1,
-        topicAndPartition._2, partitionsToBeReassigned, partitionsBeingReassigned))
-    }
-  }
-
-  def checkIfPartitionReassignmentSucceeded(zkUtils: ZkUtils, topicAndPartition: TopicAndPartition,
-                                            reassignedReplicas: Seq[Int],
-                                            partitionsToBeReassigned: Map[TopicAndPartition, Seq[Int]],
-                                            partitionsBeingReassigned: Map[TopicAndPartition, Seq[Int]]): ReassignmentStatus = {
-    val newReplicas = partitionsToBeReassigned(topicAndPartition)
-    partitionsBeingReassigned.get(topicAndPartition) match {
-      case Some(partition) => ReassignmentInProgress
-      case None =>
-        // check if the current replica assignment matches the expected one after reassignment
-        val assignedReplicas = zkUtils.getReplicasForPartition(topicAndPartition.topic, topicAndPartition.partition)
-        if (assignedReplicas == newReplicas)
-          ReassignmentCompleted
-        else {
-          println(("ERROR: Assigned replicas (%s) don't match the list of replicas for reassignment (%s)" +
-            " for partition %s").format(assignedReplicas.mkString(","), newReplicas.mkString(","), topicAndPartition))
-          ReassignmentFailed
-        }
-    }
   }
 }
 
