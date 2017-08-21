@@ -17,8 +17,8 @@ This program:
 * execution and verification of partition reassignment are supported.
 * this can be used for both expanding and shrinking case!!
 
+---
 <!-- TOC  -->
-
 - [Installation](#installation)
 - [How to use](#how-to-use)
 - [Sample Scenarios](#sample-scenarios)
@@ -27,7 +27,6 @@ This program:
 - [Partition Replica Reassignment as Binary Integer Programming](#partition-replica-reassignment-as-binary-integer-programming)
 - [How to test locally?](#how-to-test-locally)
 - [Release History](#release-history)
-
 <!-- /TOC -->
 
 # Installation
