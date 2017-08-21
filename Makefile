@@ -3,6 +3,9 @@
 num ?= 3
 brokers ?= 1,2,3
 library_path ?= /usr/local/lib
+topic ?= tp1
+partitions ?= 2
+replication_factor ?=3
 
 all: publishLocal
 
@@ -23,7 +26,7 @@ local-kafka-cluster:
 	&& docker-compose up -d "$${kafkas[@]}" \
 	&& sleep 2 \
 	&& docker-compose exec kafka1 sh -c \
-	'kafka-topics --zookeeper $$ZOOKEEPER --create --if-not-exists --topic tp1 --partitions 2 --replication-factor 3'
+	'kafka-topics --zookeeper $$ZOOKEEPER --create --if-not-exists --topic $(topic) --partitions $(partitions) --replication-factor $(replication_factor)'
 
 run:
 	sbt ';set javaOptions in run += "-Djava.library.path=$(library_path)"; run --zookeeper localhost:2181 --brokers $(brokers)'
