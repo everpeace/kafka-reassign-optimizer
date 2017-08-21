@@ -45,9 +45,6 @@ case class ReassignOptimizationProblem(topicPartitionInfos: List[TopicPartitionI
   require(balancedFactorMin <= 1.0, "balancedFactorMin should be <= 1.0")
   require(balancedFactorMax >= 1.0, "balancedFactorMax should be >= 1.0")
 
-  // to access to weight function
-  implicit def tpToTopicAndPartition(tp: (String, Int)): TopicAndPartition = TopicAndPartition(tp._1, tp._2)
-
   // this map's value is replicas and head of replicas should be leader because converted from TopicPartitionInfos
   val currentReplicaAssignment: ReplicaAssignment = topicPartitionInfos.map(_.assignment).toMap
   val currentAssignmentByTPB: List[(String, Int, Int)] = for {
