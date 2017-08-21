@@ -9,22 +9,21 @@ import scalaz.Scalaz._
 import scalaz._
 
 case class TopicPartitionInfo(tp: TP, leader: Int, replicas: List[Int], isrs: List[Int]) {
+
   import TopicPartitionInfo.Validated
 
   private def validateBalanced: Validated = this.success
-    .ensure(LeaderShouldBePreferredReplica(this).asInstanceOf[RuntimeException]){ tpi =>
+    .ensure(LeaderShouldBePreferredReplica(this).asInstanceOf[RuntimeException]) { tpi =>
       tpi.leader == tpi.replicas.head
     }.toValidationNel
 
   private def validateIsr: Validated = this.success
-    .ensure(AllReplicaShouldBeISR(this).asInstanceOf[RuntimeException]){ tpi =>
+    .ensure(AllReplicaShouldBeISR(this).asInstanceOf[RuntimeException]) { tpi =>
       tpi.replicas.toSet == tpi.isrs.toSet
     }.toValidationNel
 
   def validate: Validated
   = (validateIsr |@| validateBalanced) ((_, _) => this)
-
-  def assignment = (tp.topic, tp.partition) -> replicas
 }
 
 sealed class TopicPartitionInfoCreationException(msg: String) extends RuntimeException(msg)
