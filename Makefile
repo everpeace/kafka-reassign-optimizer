@@ -1,4 +1,4 @@
-.PHONY: test release clean publishLocal local-kafka-cluster
+.PHONY: test release clean publishLocal local-kafka-cluster run_producer stop_producer run
 
 num ?= 3
 brokers ?= 1,2,3
@@ -27,6 +27,12 @@ local-kafka-cluster:
 	&& sleep 2 \
 	&& docker-compose exec kafka1 sh -c \
 	'kafka-topics --zookeeper $$ZOOKEEPER --create --if-not-exists --topic $(topic) --partitions $(partitions) --replication-factor $(replication_factor)'
+
+run_producer:
+	TOPIC=$(topic) docker-compose up -d producer
+
+stop_producer:
+	TOPIC=$(topic) docker-compose stop producer
 
 run:
 	sbt ';set javaOptions in run += "-Djava.library.path=$(library_path)"; run --zookeeper localhost:2181 --brokers $(brokers)'

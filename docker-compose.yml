@@ -94,3 +94,19 @@ services:
     - KAFKA_BROKER_ID=5
     - BOOTSTRAP_SERVERS=kafka1:9091,kafka2:9092,kafka3:9093,kafka4:9094,kafka5:9095
     - ZOOKEEPER=zookeeper:2181
+  producer:
+    image: confluentinc/cp-kafka:3.0.0
+    command:
+    - sh
+    - -c
+    - |
+      kafka-producer-perf-test \
+      --topic ${TOPIC:-tp1} \
+      --num-records 10000000 \
+      --record-size 500 \
+      --throughput 5 \
+      --producer-props bootstrap.servers=$$BOOTSTRAP_SERVERS client.id=producer \
+    environment:
+    - COMPONENT=kafka-producer-perf-test
+    - BOOTSTRAP_SERVERS=kafka1:9091,kafka2:9092,kafka3:9093,kafka4:9094,kafka5:9095
+    - ZOOKEEPER=zookeeper:2181
