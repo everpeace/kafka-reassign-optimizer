@@ -17,6 +17,19 @@ This program:
 * execution and verification of partition reassignment are supported.
 * this can be used for both expanding and shrinking case!!
 
+<!-- TOC  -->
+
+- [Installation](#installation)
+- [How to use](#how-to-use)
+- [Sample Scenarios](#sample-scenarios)
+	- [Expanding Clusters](#expanding-clusters)
+	- [Shringking Clusters](#shringking-clusters)
+- [Partition Replica Reassignment as Binary Integer Programming](#partition-replica-reassignment-as-binary-integer-programming)
+- [How to test locally?](#how-to-test-locally)
+- [Release History](#release-history)
+
+<!-- /TOC -->
+
 # Installation
 just pull the image
 ```
@@ -302,8 +315,6 @@ Reassignment execution successfully finished!
 ```
 
 
-<a name="Formulation" />
-
 # Partition Replica Reassignment as Binary Integer Programming
 VARIABLES:
 * `{topic}_{partition}_on_{broker_id}`
@@ -335,7 +346,7 @@ CONSTRAINTS:
 - assume all needed libraries will be installed at `/usr/local/lib`
 - hit `make test`
 
-# Release Note
+# Release History
 * `0.3.0`: initial public release
 * `0.2.0`: closed release (heavily experimental)
 * `0.1.0`: closed release (heavily experimental)
