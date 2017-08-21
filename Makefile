@@ -7,7 +7,7 @@ library_path ?= /usr/local/lib
 all: publishLocal
 
 publishLocal: test
-	sbt publishLocal
+	sbt docker:publishLocal
 
 clean:
 	sbt clean
