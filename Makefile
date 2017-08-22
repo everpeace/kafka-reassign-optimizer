@@ -6,6 +6,7 @@ library_path ?= /usr/local/lib
 topic ?= tp1
 partitions ?= 2
 replication_factor ?=3
+options ?= 
 
 all: publishLocal
 
@@ -35,4 +36,4 @@ stop_producer:
 	TOPIC=$(topic) docker-compose stop producer
 
 run:
-	sbt ';set javaOptions in run += "-Djava.library.path=$(library_path)"; run --zookeeper localhost:2181 --brokers $(brokers)'
+	sbt ';set javaOptions in run += "-Djava.library.path=$(library_path)"; run --zookeeper localhost:2181 --brokers $(brokers) $(options)'
