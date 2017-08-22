@@ -1,8 +1,5 @@
 package com.github.everpeace.kafka.reassign_optimizer
 
-import java.time.Instant
-import java.time.temporal.ChronoUnit
-
 import com.github.everpeace.kafka.reassign_optimizer.ReassignOptimizationProblem.Solution
 import kafka.admin._
 import kafka.common.TopicAndPartition
@@ -12,8 +9,6 @@ import org.apache.kafka.common.security.JaasUtils
 
 import scala.collection.convert.decorateAsScala._
 import scala.collection.immutable.ListMap
-import scala.collection.{Map, Seq}
-import scala.util.control.Breaks
 import scalaz.Scalaz._
 import scalaz._
 
@@ -73,7 +68,8 @@ object Main extends App {
       println("# let's find well balanced but minimum partition movements")
       println("#")
 
-      val Solution(solverStatus, moveAmount, brokerWeights, proposedAssignment) = problem.solve()
+      val solution = problem.solve()
+      val Solution(solverStatus, moveAmount, brokerWeights, proposedAssignment) = solution
 
       println("\n#")
       println("# Summary of Proposed Partition Assignment")
@@ -116,27 +112,49 @@ object Main extends App {
           case false =>
             println("aborted.")
           case true =>
+            if (batchWeight <= 0){
+              val partitioner = MoveAmountPartitioner(batchWeight)
+              val batches = partitioner.partition(solution)
 
-            OneShotAssignmentExecutor(zk).executeAssignment(proposedAssignment)
-
-            if (verify) {
-              val status = PollingAssignmentVerifyier(zk, verifyInterval, verifyTimeout)
-                .verify(proposedAssignment)
-
-              status match {
-                case ReassignmentCompleted =>
-                  println("Reassignment execution successfully finished!")
-                case ReassignmentInProgress =>
-                  println("Verifying reassignments timeout! Reassignments might be in progress. Check manually.")
-                case ReassignmentFailed =>
-                  println("Reassignment execution finished! Several reassignments might be failed. Check manually.")
+              println("\n#")
+              println(s"# Reassign Execution in batch mode (batch-weight = ${batchWeight})")
+              println(s"# Proposed assignment was partitioned into ${batches.length} batches")
+              batches.zipWithIndex foreach {
+                case (batchedAssignment, i) =>
+                  println(s"#  batch${i+1}/${batches.length} = ${batchedAssignment.keys.mkString(",")}")
               }
 
+              batches.zipWithIndex foreach {
+                case (batchedAssignment, i) =>
+                  println(s"\n# Batch ${i+1}/${batches.length}")
+                  executeAndVerify(batchedAssignment)
+              }
             } else {
-              println("Reassignment execution finished! Check reassignment progress manually.")
+              executeAndVerify(proposedAssignment)
             }
         }
       }
+  }
+
+  private def executeAndVerify(proposedAssignment: ReplicaAssignment) = {
+    AssignmentExecutor(zk).executeAssignment(proposedAssignment)
+
+    if (verify) {
+      val status = PollingAssignmentVerifyier(zk, verifyInterval, verifyTimeout)
+        .verify(proposedAssignment)
+
+      status match {
+        case ReassignmentCompleted =>
+          println("Reassignment execution successfully finished!")
+        case ReassignmentInProgress =>
+          println("Verifying reassignments timeout! Reassignments might be in progress. Check manually.")
+        case ReassignmentFailed =>
+          println("Reassignment execution finished! Several reassignments might be failed. Check manually.")
+      }
+
+    } else {
+      println("Reassignment execution finished! Check reassignment progress manually.")
+    }
   }
 }
 
