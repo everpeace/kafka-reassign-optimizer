@@ -61,9 +61,10 @@ object Main extends App {
       println(s"Total Replica Weights: ${problem.totalReplicaWeight}")
       println(s"Current Broker Set: ${currentAssignment.values.flatten.toSet.toList.sorted.mkString(",")}")
       println(s"Broker Weights: ${ListMap(currentAssignment.brokerWeights.toSeq.sortBy(_._1): _*)}")
-      if (printAssignment)
+      if (printAssignment){
         println("Current Partition Assignment:")
-      println(currentAssignment.show)
+        println(currentAssignment.show)
+      }
 
       println("\n#")
       println("# Finding Optimal Partition Assignment ")
@@ -82,10 +83,10 @@ object Main extends App {
       println(s"Replica Move Amount: ${moveAmount}")
       println(s"New Broker Set: ${newBrokers.toList.sorted.mkString(",")}")
       println(s"Broker Weights: ${ListMap(brokerWeights.toSeq.sortBy(_._1): _*)}")
-      if (printAssignment)
+      if (printAssignment){
         println("Proposed Partition Assignment:")
-      println(proposedAssignment.showWithMoveAmounts(moveAmounts))
-
+        println(proposedAssignment.showWithMoveAmounts(moveAmounts))
+      }
       if (solverStatus != ProblemStatus.OPTIMAL) {
         println(s"!!Solution is ${solverStatus}. Aborted!!".toUpperCase)
         sys.exit(0)
