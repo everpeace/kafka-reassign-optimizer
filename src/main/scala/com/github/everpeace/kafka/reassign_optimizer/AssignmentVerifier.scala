@@ -80,7 +80,7 @@ case class PollingAssignmentVerifyier(zkUtils: ZkUtils, interval: Duration, time
     println("\n#")
     println("# Verifying Reassignment")
     println(s"#  interval = ${interval} ")
-    println(s"#  timeout  = ${interval} (until ${start.plus(timeout.toMillis, ChronoUnit.MILLIS)})")
+    println(s"#  timeout  = ${timeout} (until ${start.plus(timeout.toMillis, ChronoUnit.MILLIS)})")
     println("#")
     val b = new Breaks
     var status: ReassignmentStatus = ReassignmentInProgress
