@@ -24,6 +24,7 @@ This program:
 - [Sample Scenarios](#sample-scenarios)
 	- [Expanding Clusters](#expanding-clusters)
 	- [Shringking Clusters](#shringking-clusters)
+	- [Executing Reassignment in Batch Mode](#executing-reassignment-in-batch-mode)
 - [Partition Replica Reassignment as Binary Integer Programming](#partition-replica-reassignment-as-binary-integer-programming)
 - [How to test locally?](#how-to-test-locally)
 - [Release History](#release-history)
@@ -37,7 +38,7 @@ $ docker pull everpeace/kafka-reassign-optimizer
 
 # How to use
 ```
-$ docker run everepeace/kafka-reassign-optimier --help
+$ docker run everpeace/kafka-reassign-optimizer --help
 kafka-reassign-optimizer calculating balanced partition replica reassignment but minimum replica move.
 Usage: kafka-reassign-optimizer [options]
 
@@ -51,14 +52,14 @@ Usage: kafka-reassign-optimizer [options]
                            stretch factor to decide new assignment is well-balanced (must be <= 1.0, default = 0.9)
   --balanced-factor-max <value>
                            stretch factor to decide new assignment is well-balanced (must be >= 1.0, default = 1.0)
-  -e, --execute <value>    execute reassignment when found solution is optimal (default = true)
+  -e, --execute            execute re-assignment when found solution is optimal (default = false)
+  --batch-weight <value>   execute re-assignment in batch mode (default = 0 (0 means execute re-assignment all at once))
   --verify <value>         verifying reassignment finished after execution of reassignment fired (default = true). this option is active only when execution is on.
   --verify-interval (e.g. 1s, 1min,..)
                            interval duration of verifying reassignment execution progress (default = 5 seconds)
   --verify-timeout (e.g. 1m, 1hour,..)
                            timeout duration of verifying reassignment execution progress (default = 5 minutes)
   --help                   prints this usage text
-
 ```
 
 # Sample Scenarios
@@ -313,6 +314,111 @@ Reassignment of partition [tp1,1] completed successfully
 Reassignment execution successfully finished!
 ```
 
+## Executing Reassignment in Batch Mode
+For the case to re-assign bunch of topic-partitions, `kafka-reassign-optimizer` supports batch mode. In batch mode, the tool divide up topic-partitions to move into several batches and execute re-assignment sequentially per batch.
+
+You can control batch size(weight) via `--batch-size`
+
+Below is just an example of 2-batches.
+```
+ $ docker run -it --rm --net host everpeace/kafka-reassign-optimizer --print-assignment --zookeeper 127.0.0.1:2181 --brokers 1,2,3,4,5 --batch-weight 1
+...
+#
+# Reassign Execution in batch mode (batch-weight = 1)
+# Proposed assignment was partitioned into 2 batches below:
+#   batch 1/2: (tp1,1) (move amount = 1)
+#   batch 2/2: (tp1,0) (move amount = 2)
+
+#
+# Batch 1/2 = (tp1,1) (move amount = 1)
+# Original replica assignment:
+
+#        broker    1    2    3    4    5              
+#   
+#      [tp1, 1]    1   ⚐1    1    0    0   (RF = 3)   
+#   
+#             ⚐   leader partition     
+# New replica assignment:
+
+#        broker    1    2    3    4    5                                  
+#   
+#      [tp1, 1]    0   ⚐1    1    0    1   (RF = 3)   (move amount = 1)   
+#   
+#             ⚐   leader partition                      
+#
+Ready to execute this batch (y => next batch, s => skip, n => abort)?? (Y/s/n)
+y
+
+#
+# Executing Reassignment
+#
+Current partition replica assignment
+
+{"version":1,"partitions":[{"topic":"tp1","partition":2,"replicas":[3,1,2]},{"topic":"tp1","partition":1,"replicas":[2,3,1]},{"topic":"tp1","partition":0,"replicas":[1,2,3]}]}
+
+Save this to use as the --reassignment-json-file option during rollback
+Successfully started reassignment of partitions {"version":1,"partitions":[{"topic":"tp1","partition":1,"replicas":[2,3,5]}]}
+
+#
+# Verifying Reassignment
+#  interval = 5 seconds
+#  timeout  = 5 minutes (until 2017-08-22T17:16:04.906Z)
+#
+1-st try
+Verifying.. (time = 2017-08-22T17:11:04.981Z)
+Reassignment of partition [tp1,1] is still in progress
+
+2-nd try
+Verifying.. (time = 2017-08-22T17:11:09.992Z)
+Reassignment of partition [tp1,1] completed successfully
+
+Reassignment execution successfully finished!
+
+#
+# Batch 2/2 = (tp1,0) (move amount = 2)
+# Original replica assignment:
+
+#        broker    1    2    3    4    5              
+#   
+#      [tp1, 0]   ⚐1    1    1    0    0   (RF = 3)   
+#   
+#             ⚐   leader partition     
+# New replica assignment:
+
+#        broker    1    2    3    4    5                                  
+#   
+#      [tp1, 0]   ⚐1    0    0    1    1   (RF = 3)   (move amount = 2)   
+#   
+#             ⚐   leader partition                      
+#
+Ready to execute this batch (y => next batch, s => skip, n => abort)?? (Y/s/n)
+y
+
+#
+# Executing Reassignment
+#
+Current partition replica assignment
+
+{"version":1,"partitions":[{"topic":"tp1","partition":2,"replicas":[3,1,2]},{"topic":"tp1","partition":1,"replicas":[2,3,5]},{"topic":"tp1","partition":0,"replicas":[1,2,3]}]}
+
+Save this to use as the --reassignment-json-file option during rollback
+Successfully started reassignment of partitions {"version":1,"partitions":[{"topic":"tp1","partition":0,"replicas":[1,5,4]}]}
+
+#
+# Verifying Reassignment
+#  interval = 5 seconds
+#  timeout  = 5 minutes (until 2017-08-22T17:16:14.082Z)
+#
+1-st try
+Verifying.. (time = 2017-08-22T17:11:14.083Z)
+Reassignment of partition [tp1,0] is still in progress
+
+2-nd try
+Verifying.. (time = 2017-08-22T17:11:19.088Z)
+Reassignment of partition [tp1,0] completed successfully
+
+Reassignment execution successfully finished!
+```
 
 # Partition Replica Reassignment as Binary Integer Programming
 VARIABLES:

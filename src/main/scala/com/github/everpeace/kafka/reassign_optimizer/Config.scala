@@ -10,7 +10,8 @@ case class Config(
                    printAssignment: Boolean = false,
                    balancedFactorMin: Double = 0.9d,
                    balancedFactorMax: Double = 1.0d,
-                   execute: Boolean = true,
+                   execute: Boolean = false,
+                   batchWeight: Int = 0, // 0 means execute all re-assignment at once.
                    verify: Boolean = true,
                    verifyInterval: Duration = 5 seconds,
                    verifyTimeout: Duration = 5 minutes
@@ -53,9 +54,16 @@ object Config {
         else failure("balanced-factor-max must be >= 1.0")
       ).action((f, c) => c.copy(balancedFactorMax = f))
 
-    opt[Boolean]('e', "execute")
-      .text(s"execute reassignment when found solution is optimal (default = ${Config().execute})")
-      .action((e, c) => c.copy(execute = e))
+    opt[Unit]('e', "execute")
+      .text(s"execute re-assignment when found solution is optimal (default = ${Config().execute})")
+      .action((_, c) => c.copy(execute = true))
+
+    opt[Int]("batch-weight")
+      .text(s"execute re-assignment in batch mode (default = ${Config().batchWeight} (0 means execute re-assignment all at once))")
+      .validate( b =>
+        if( b >= 0 ) success
+        else failure("batch-weight must not be negative.")
+      ).action((b,c) => c.copy(batchWeight =  b))
 
     opt[Boolean]("verify")
       .text(s"verifying reassignment finished after execution of reassignment fired (default = ${Config().verify}). this option is active only when execution is on.")

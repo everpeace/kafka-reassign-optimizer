@@ -26,10 +26,15 @@ package object reassign_optimizer {
       replica <- assignment(tp)
     } yield (tp._1, tp._2, replica)
 
-    def show(implicit problem: ReassignOptimizationProblem): String = {
+    def showWithMoveAmounts(moveAmounts: Map[(String, Int), Int])(implicit problem: ReassignOptimizationProblem) = show(true, true, Some(moveAmounts))
+
+    def show(implicit problem: ReassignOptimizationProblem): String = show(true, true, None)
+
+    def show(showBroker: Boolean, showWeight: Boolean, moveAmounts: Option[Map[(String, Int), Int]])
+            (implicit problem: ReassignOptimizationProblem): String = {
       val weights = problem.partitionWeights
       val sortedBrokers = problem.brokersOnProblem.toList.sorted
-      val brokersRow = List("broker") ++ sortedBrokers.map(_.toString) ++ List("")
+      val brokersRow = List("broker") ++ sortedBrokers.map(_.toString) ++ List("") ++ (if (moveAmounts.isDefined) List("") else List.empty)
 
       var existsNewLeader = false
       val assignmentRows = for {topicPartition <- assignment.keys.toList.sorted} yield {
@@ -49,7 +54,12 @@ package object reassign_optimizer {
             " 0"
           }
         }
-        List(s"[${topicPartition._1}, ${topicPartition._2}]") ++ as ++ List(s"(RF = ${as.filterNot(_ == " 0").length})")
+        List(s"[${topicPartition._1}, ${topicPartition._2}]") ++ as ++ List(s"(RF = ${as.filterNot(_ == " 0").length})") ++ (
+          if (moveAmounts.isDefined)
+            List(s"(move amount = ${moveAmounts.get(topicPartition._1 -> topicPartition._2)})")
+          else
+            List.empty
+          )
       }
 
       val brokerWeightsRow = List("weight") ++ {
@@ -57,16 +67,19 @@ package object reassign_optimizer {
         sortedBrokers.map { b =>
           w(b).toString
         }
-      } ++ List("")
+      } ++ List("") ++ (if (moveAmounts.isDefined) List("") else List.empty)
 
       val legends = if (existsNewLeader)
         List('⚐' -> "leader partition", '⚑' -> "new leader partition")
       else
         List('⚐' -> "leader partition")
 
+      val rows = (if (showBroker) List(brokersRow) else List.empty) ++ assignmentRows ++ (if (showWeight) List(brokerWeightsRow) else List.empty)
       Tabulator.format(
-        List(brokersRow) ++ assignmentRows ++ List(brokerWeightsRow),
-        legends
+        rows,
+        legends,
+        if (showBroker) 1 else 0,
+        if (showWeight) 1 else 0
       )
     }
 

@@ -7,7 +7,7 @@ object Tabulator {
   val rowSeparatorColumnSeparatorString = ""
   val columnSeparatorString = "   "
 
-  def format(table: Seq[Seq[Any]], legends: Seq[(Char, String)] = Seq.empty): String = table match {
+  def format(table: Seq[Seq[Any]], legends: Seq[(Char, String)] = Seq.empty, numRowHeader: Int = 1, numRowFooter: Int = 1): String = table match {
     case Seq() => ""
     case _ =>
       val sizes = for (row <- table) yield {
@@ -22,20 +22,18 @@ object Tabulator {
         List(s"%${colSizes.head}s".format(c), s"%-${colSizes.tail.sum}s".format(des))
           .mkString(columnSeparatorString, columnSeparatorString, columnSeparatorString)
       }
-
-      formatRows(rowSeparator(colSizes), rows, formattedLegends)
+      val (headers, remained) = rows.splitAt(numRowHeader)
+      val (footersR, contentsR) = remained.reverse.splitAt(numRowFooter)
+      formatRows(rowSeparator(colSizes), headers, contentsR.reverse, footersR.reverse, formattedLegends)
   }
 
-  def formatRows(rowSeparator: String, rows: Seq[String], legends: Seq[String]): String = {
-    val header = rows.head
-    val footer = rows.reverse.head
-    val contents = rows.tail.reverse.tail.reverse
+  def formatRows(rowSeparator: String, headers: Seq[String], contents: Seq[String], footers: Seq[String], legends: Seq[String]): String = {
     (rowSeparator ::
-      header ::
+      headers.toList :::
       rowSeparator ::
       contents.toList :::
       rowSeparator ::
-      footer ::
+      footers.toList :::
       legends.toList :::
       List()).mkString("\n")
   }

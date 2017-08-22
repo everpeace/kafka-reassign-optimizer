@@ -80,19 +80,24 @@ case class PollingAssignmentVerifyier(zkUtils: ZkUtils, interval: Duration, time
     println("\n#")
     println("# Verifying Reassignment")
     println(s"#  interval = ${interval} ")
-    println(s"#  timeout  = ${interval} (until ${start.plus(timeout.toMillis, ChronoUnit.MILLIS)})")
+    println(s"#  timeout  = ${timeout} (until ${start.plus(timeout.toMillis, ChronoUnit.MILLIS)})")
     println("#")
     val b = new Breaks
     var status: ReassignmentStatus = ReassignmentInProgress
     b.breakable {
+      var i = 1
+      def suff(c: Int) = if (c % 10 == 1) "st" else if (c % 10 == 2) "nd" else if (c % 10 == 3) "rd" else "th"
       while (Instant.now.isBefore(start.plus(timeout.toMillis, ChronoUnit.MILLIS))) {
+        println(s"$i-${suff(i)} try")
         val st = verifyAssignment(assignment)
+        i += 1
         status = st
         if (status != ReassignmentInProgress) {
           b.break
         }
         Thread.sleep(interval.toMillis)
       }
+      println(s"$i-${suff(i)} try")
       verifyAssignment(assignment)
     }
     status

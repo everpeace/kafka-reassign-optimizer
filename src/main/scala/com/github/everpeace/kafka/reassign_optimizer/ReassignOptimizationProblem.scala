@@ -211,6 +211,14 @@ object ReassignOptimizationProblem {
       moveAmount(originalAssignment, proposedAssignment)
     else 0
 
+    def moveAmounts: Map[(String, Int), Int] = if (status == ProblemStatus.OPTIMAL)
+      moveAmounts(originalAssignment, proposedAssignment)
+    else originalAssignment.mapValues(_ => 0)
+
+    def moveCounts: Map[(String, Int), Int] = if(status == ProblemStatus.OPTIMAL)
+      moveCounts(originalAssignment, proposedAssignment)
+    else originalAssignment.mapValues(_ => 0)
+
     def brokerWeights = if (status == ProblemStatus.OPTIMAL)
       proposedAssignment.brokerWeights
     else problem.brokersOnProblem.map(b => b -> 0).toMap
@@ -218,14 +226,22 @@ object ReassignOptimizationProblem {
     private def moveCount(old: Set[Int], `new`: Set[Int]) = {
       require(old.size == `new`.size)
       // when |old| == |new|  move_cunt = |old - old ∩ new| = |new - old ∩ new|
-      old.diff(`new`)
+      old.diff(`new`).size
     }
 
-    private def moveAmount(old: ReplicaAssignment, `new`: ReplicaAssignment): Int = (for {
-      tp <- old.keys.toList
+    private def moveCounts(old: ReplicaAssignment, `new`: ReplicaAssignment): Map[(String, Int), Int] = for {
+      (tp, _) <- old
     } yield {
-      moveCount(old(tp).toSet, `new`(tp).toSet).size * problem.partitionWeights(tp)
-    }).sum
+      tp -> moveCount(old(tp).toSet, `new`(tp).toSet)
+    }
+
+    private def moveAmounts(old: ReplicaAssignment, `new`: ReplicaAssignment): Map[(String, Int), Int] = for {
+      (tp, _) <- old
+    } yield {
+      tp -> (moveCount(old(tp).toSet, `new`(tp).toSet) * problem.partitionWeights(tp))
+    }
+
+    private def moveAmount(old: ReplicaAssignment, `new`: ReplicaAssignment): Int = moveAmounts(old, `new`).values.sum
 
   }
 
