@@ -1,7 +1,6 @@
 package com.github.everpeace.kafka.reassign_optimizer
 
 import com.github.everpeace.kafka.reassign_optimizer.ReassignOptimizationProblem.Solution
-import com.github.everpeace.kafka.reassign_optimizer.util.Tabulator
 import kafka.admin._
 import kafka.common.TopicAndPartition
 import kafka.utils.ZkUtils
@@ -23,7 +22,7 @@ object Main extends App {
   import config._
 
   val zk = ZkUtils(zkString, 30000, 30000, JaasUtils.isZkSecurityEnabled)
-  val partitionWeights = (_: TopicAndPartition) => 1
+  val partitionWeights = weightType.partitionWeight(zk)
   val topicMetas = AdminUtils.fetchTopicMetadataFromZk(
     if (topics.isEmpty) zk.getAllTopics().toSet else topics,
     zk

@@ -18,6 +18,7 @@ object Dependencies {
     val version = Versions.optimus
     val core =  "com.github.vagmcs" %% "optimus" % version
     val solverLp = "com.github.vagmcs" %% "optimus-solver-lp" % version
+    val oj = "com.github.vagmcs" %% "optimus-solver-oj" % version
   }
 
   object Scalaz {

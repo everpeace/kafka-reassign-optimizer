@@ -12,7 +12,8 @@ lazy val root = (project in file(".")).
       Scalaz.core,
       Kafka.kafka,
       Optimus.core,
-      Optimus.solverLp
+      Optimus.solverLp// ,
+      // Optimus.oj
     ) ++ Circe.all ++ Seq(
       scalaTest % Test
     ),

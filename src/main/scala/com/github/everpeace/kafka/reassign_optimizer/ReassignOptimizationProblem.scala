@@ -95,6 +95,15 @@ case class ReassignOptimizationProblem(topicPartitionInfos: List[TopicPartitionI
     move * 0.5
   }
 
+//  val `distribution of broker weights`: Expression = {
+//    val brokerWeights = assignmentVariables.groupBy(_._1._3).mapValues(_.foldLeft(Const(0.0): Expression)({
+//        case (accum, (tp, v)) => accum + (v * partitionWeights((tp._1, tp._2)))
+//
+//    })).values.toList
+//    val avg = brokerWeights.fold(Const(0.0): Expression)(_ + _) * (1.0d / brokerWeights.length)
+//    brokerWeights.map(w => (avg - w) * (avg - w) ).fold(Const(0.0): Expression)(_ + _) * (1.0d / brokerWeights.length)
+//  }
+
   //
   // constraints
   //
@@ -145,6 +154,7 @@ case class ReassignOptimizationProblem(topicPartitionInfos: List[TopicPartitionI
 
   def solve(): Solution = {
 
+//    minimize(`total amount of replica movement` + `distribution of broker weights`)
     minimize(`total amount of replica movement`)
     add(`C1: total replica weight doesn't change`)
     for {

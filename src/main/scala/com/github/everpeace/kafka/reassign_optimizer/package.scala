@@ -1,7 +1,12 @@
 package com.github.everpeace.kafka
 
+import com.github.everpeace.kafka.reassign_optimizer.Config.WeightType.{Constant, Offset, WeightType}
 import com.github.everpeace.kafka.reassign_optimizer.util.Tabulator
+import kafka.api.{OffsetRequest, PartitionOffsetRequestInfo}
 import kafka.common.TopicAndPartition
+import kafka.consumer.SimpleConsumer
+import kafka.utils.ZkUtils
+import org.apache.kafka.common.protocol.{Errors, SecurityProtocol}
 
 package object reassign_optimizer {
 
@@ -105,4 +110,28 @@ package object reassign_optimizer {
   implicit def fromTopicPartitionInfosToReplicaAssignment(tpis: List[TopicPartitionInfo]): ReplicaAssignment = tpis.assignment
 
   implicit def fromTopicPartitionInfosToTpbPairs(tpis: List[TopicPartitionInfo]): List[(String, Int, Int)] = tpis.tpbPairs
+
+
+  implicit class WeightTypeOps(wt: WeightType) {
+    def partitionWeight(zkUtils: ZkUtils): TopicAndPartition => Int = wt match {
+      case Constant => _ => 1
+      case Offset =>
+        val tps = zkUtils.getAllPartitions()
+        val brokers = zkUtils.getAllBrokersInCluster().map(_.endPoints(SecurityProtocol.PLAINTEXT))
+        val clients = brokers.map { b =>
+          new SimpleConsumer(b.host, b.port, 10000, 100000, "KafkaReassignOptimizer")
+        }
+
+        val requestInfo = tps.map(tp => tp -> PartitionOffsetRequestInfo(OffsetRequest.LatestTime, 1)).toMap
+        val merged = clients.map { c =>
+          val response = c.getOffsetsBefore(OffsetRequest(requestInfo = requestInfo))
+          val pw = response.partitionErrorAndOffsets.collect {
+            case (tp, res) if res.error == Errors.NONE.code =>
+              tp -> (res.offsets.sum/res.offsets.length).toInt
+          }
+          pw
+        }.reduce(_ ++ _)
+        merged
+    }
+  }
 }
