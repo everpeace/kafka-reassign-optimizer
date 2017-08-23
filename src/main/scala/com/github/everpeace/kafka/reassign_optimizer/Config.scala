@@ -1,12 +1,15 @@
 package com.github.everpeace.kafka.reassign_optimizer
 
-import scala.concurrent.duration.Duration
-import scala.concurrent.duration._
+import com.github.everpeace.kafka.reassign_optimizer.Config.WeightType
+import com.github.everpeace.kafka.reassign_optimizer.Config.WeightType.WeightType
+
+import scala.concurrent.duration.{Duration, _}
 
 case class Config(
                    zkString: String ="",
                    newBrokers: Set[Int] = Set.empty,
                    topics: Set[String] = Set.empty,
+                   weightType: WeightType = WeightType.Constant,
                    printAssignment: Boolean = false,
                    balancedFactorMin: Double = 0.9d,
                    balancedFactorMax: Double = 1.0d,
@@ -18,6 +21,16 @@ case class Config(
                  )
 
 object Config {
+
+  object WeightType extends Enumeration {
+    type WeightType = Value
+    val Constant, Offset = Value
+  }
+
+  implicit val weekDaysRead: scopt.Read[WeightType.Value] =
+    scopt.Read.reads(x => WeightType.withName(x.toLowerCase.capitalize))
+
+
   val parser = new scopt.OptionParser[Config]("kafka-reassign-optimizer") {
     val default = Config()
 
@@ -35,6 +48,11 @@ object Config {
       .text("target topics (all topics when not specified)")
       .valueName("topic1,topic2,...")
       .action((topics, c) => c.copy(topics = topics.toSet))
+
+    opt[WeightType.Value]("weight-type")
+      .text(s"type of topic-partition weight. (default = ${default.weightType.toString.toLowerCase})")
+      .valueName(s"${WeightType.values.map(_.toString.toLowerCase).mkString("|")}")
+      .action((wt, c) => c.copy(weightType = wt))
 
     opt[Unit]("print-assignment")
       .text(s"print assignment matrix. please noted this might make huge output when there are a lot topic-partitions (default = ${default.printAssignment})")
@@ -81,4 +99,5 @@ object Config {
 
     help("help").text("prints this usage text")
   }
+
 }
