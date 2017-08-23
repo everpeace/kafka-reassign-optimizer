@@ -554,6 +554,9 @@ CONSTRAINTS:
 - hit `make test`
 
 # Release History
+* `0.4.0`:
+  - batched re-assignment execution/verification support (#7)
+  - support using topic-partition offsets as weights (#8)
 * `0.3.0`: initial public release
 * `0.2.0`: closed release (heavily experimental)
 * `0.1.0`: closed release (heavily experimental)
