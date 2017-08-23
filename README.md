@@ -25,6 +25,7 @@ This program:
 	- [Expanding Clusters](#expanding-clusters)
 	- [Shringking Clusters](#shringking-clusters)
 	- [Executing Reassignment in Batch Mode](#executing-reassignment-in-batch-mode)
+	- [Use topic-partition offset as weight](#use-topic-partition-offset-as-weight)
 - [Partition Replica Reassignment as Binary Integer Programming](#partition-replica-reassignment-as-binary-integer-programming)
 - [How to test locally?](#how-to-test-locally)
 - [Release History](#release-history)
@@ -47,6 +48,8 @@ Usage: kafka-reassign-optimizer [options]
   --brokers id1,id2,...    broker ids to which replicas re distributed to
   --topics topic1,topic2,...
                            target topics (all topics when not specified)
+  --weight-type constant|offset
+                           type of topic-partition weight. (default = constant)
   --print-assignment       print assignment matrix. please noted this might make huge output when there are a lot topic-partitions (default = false)
   --balanced-factor-min <value>
                            stretch factor to decide new assignment is well-balanced (must be <= 1.0, default = 0.9)
@@ -84,7 +87,7 @@ $ docker-compose up -d kafka4 kafka5
 # $ docker-compose down -v # to teardown
 
 # run kafka-reassign-optimizer
-$ docker run -it --rm --net host everpeace/kafka-reassign-optimizer --print-assignment --zookeeper 127.0.0.1:2181 --brokers 1,2,3,4,5
+$ docker run -it --rm --net host everpeace/kafka-reassign-optimizer --print-assignment --zookeeper 127.0.0.1:2181 --brokers 1,2,3,4,5 -e
 
 #
 # Summary of Current Partition Assignment
@@ -201,7 +204,7 @@ Reassignment execution successfully finished!
 - and you will shutdown broker `2,3`
 
 ```
-$ docker run -it --rm --net host everpeace/kafka-reassign-optimizer --print-assignment --zookeeper 127.0.0.1:2181 --brokers 1,4,5
+$ docker run -it --rm --net host everpeace/kafka-reassign-optimizer --zookeeper localhost:2181 --brokers 1,4,5 --print-assignment -e
 
 #
 # Summary of Current Partition Assignment
@@ -321,7 +324,7 @@ You can control batch size(weight) via `--batch-size`
 
 Below is just an example of 2-batches.
 ```
- $ docker run -it --rm --net host everpeace/kafka-reassign-optimizer --print-assignment --zookeeper 127.0.0.1:2181 --brokers 1,2,3,4,5 --batch-weight 1
+ $ docker run -it --rm --net host everpeace/kafka-reassign-optimizer --print-assignment --zookeeper 127.0.0.1:2181 --brokers 1,2,3,4,5 -e --batch-weight 1
 ...
 #
 # Reassign Execution in batch mode (batch-weight = 1)
@@ -419,6 +422,105 @@ Reassignment of partition [tp1,0] completed successfully
 
 Reassignment execution successfully finished!
 ```
+
+## Use topic-partition offset as weight
+By default, weight of topic-partition is just constant(`=1`).  However, there is a case you would like to put weight for each topic-partition by offset values.  Using offsets of topic-paritions can measure more precise amount of data among brokers.
+
+If you want to use this, simply add option `--weight-type offset` like below.  When you use `--weight-type offset`, you might need to adjust `--blanced-factor-{min|max}` because weights of topic-partitions is not uniform.
+
+```
+$ docker run -it --rm --net host everpeace/kafka-reassign-optimizer --print-assignment --zookeeper 127.0.0.1:2181 --brokers 1,2,3,4,5 --weight-type offset --balanced-factor-min 0.6 --balanced-factor-max 1.2
+
+#
+# Summary of Current Partition Assignment
+#
+Total Replica Weights: 174
+Current Broker Set: 1,2,3
+Broker Weights: Map(1 -> 58, 2 -> 58, 3 -> 58, 4 -> 0, 5 -> 0)
+Current Partition Assignment:
+
+     broker     1     2     3    4    5              
+
+   [tp1, 0]    20    20   ⚐20    0    0   (RF = 3)   
+   [tp1, 1]   ⚐19    19    19    0    0   (RF = 3)   
+   [tp1, 2]    19   ⚐19    19    0    0   (RF = 3)   
+
+     weight    58    58    58    0    0              
+          ⚐   leader partition        
+
+#
+# Finding Optimal Partition Assignment 
+# let's find well balanced but minimum partition movements
+#
+  ______________________     ______            
+  ___  /___  __ \_  ___/________  /__   ______ 
+  __  / __  /_/ /____ \_  __ \_  /__ | / /  _ \
+  _  /___  ____/____/ // /_/ /  / __ |/ //  __/
+  /_____/_/     /____/ \____//_/  _____/ \___/ 
+
+Model lpSolve: 14x15
+Configuring variable bounds...
+Adding objective function...
+Creating constraints: Added 14 constraints in 3ms
+Solving...
+Solution status is Optimal
+
+#
+# Summary of Proposed Partition Assignment
+#
+Is Solution Optimal?: Optimal
+Total Replica Weights: 174
+Replica Move Amount: 58
+New Broker Set: 1,2,3,4,5
+Broker Weights: Map(1 -> 39, 2 -> 38, 3 -> 39, 4 -> 38, 5 -> 20)
+Proposed Partition Assignment:
+
+     broker     1     2     3     4     5                                   
+
+   [tp1, 0]    20     0   ⚐20     0    20   (RF = 3)   (move amount = 20)   
+   [tp1, 1]   ⚐19    19     0    19     0   (RF = 3)   (move amount = 19)   
+   [tp1, 2]     0   ⚐19    19    19     0   (RF = 3)   (move amount = 19)   
+
+     weight    39    38    39    38    20                                   
+          ⚐   leader partition                            
+
+#
+# Proposed Assignment
+# (You can save below json and pass it to kafka-reassign-partition command)
+#
+{
+  "version" : 1,
+  "partitions" : [
+    {
+      "topic" : "tp1",
+      "partition" : 0,
+      "replicas" : [
+        3,
+        1,
+        5
+      ]
+    },
+    {
+      "topic" : "tp1",
+      "partition" : 1,
+      "replicas" : [
+        1,
+        4,
+        2
+      ]
+    },
+    {
+      "topic" : "tp1",
+      "partition" : 2,
+      "replicas" : [
+        2,
+        4,
+        3
+      ]
+    }
+  ]
+}
+```  
 
 # Partition Replica Reassignment as Binary Integer Programming
 VARIABLES:
